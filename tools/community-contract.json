@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "e288be8797874783db44aa6fa1819cf8d48ab03c",
+  "sdkVersion": "1.0.0-rc6",
+  "contractVersion": 1,
+  "manifestSha256": "73e958c9d33c11267f5d4859f4199643fae4ef07b99d1801a38c648e3456a2a2",
+  "tool": {
+    "path": "tools/sdk-tools.jar",
+    "size": 15406606,
+    "sha256": "af2f4adc41d5bca1c45e96e4f848eb70f81f3b1ff16e9550cea767a9422eab06"
+  }
+}
