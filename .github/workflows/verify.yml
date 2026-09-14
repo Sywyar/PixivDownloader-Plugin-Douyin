@@ -20,6 +20,11 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24.21.0'
+      - name: Install Maven Wrapper prerequisite
+        run: |
+          # The Wrapper checksum is for the ZIP distribution, which requires unzip.
+          apt-get update
+          apt-get install --yes --no-install-recommends unzip
       - name: Build and test
         run: |
           umask 022
