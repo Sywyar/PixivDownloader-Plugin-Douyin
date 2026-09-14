@@ -1,113 +1,89 @@
-# PixivDownloader Plugin SDK 1.0.0-rc6
+# PixivDownloader Douyin plugin and community submission example
 
 [简体中文](README.md)
 
-The extracted root is a standalone Maven project with sources in `src/`. Its SDK identity is `sdk-api-v1.0.0-rc6`, built from main-repository commit `e288be8797874783db44aa6fa1819cf8d48ab03c`. Open `docs/javadocs/index.html` for the API reference.
+Adds Douyin downloads, queue operations, a gallery and scheduled sources to PixivDownloader. The plugin ID is `douyin`, its version is `1.0.0-rc.1`, and its only production dependency is the published `io.github.sywyar.pixivdownloader:pixivdownload-sdk:1.0.0-rc6`. No host source checkout is required.
 
-The package includes `.git/` with an initial commit on `main` containing all delivered files. Use `git status` and `git diff` to review your changes. Configure your Git name and email before committing your work, and add a remote when you need one. The `.gitignore` excludes build output, local IDE settings, and `.dev/` runtime data.
+This repository also serves as a complete community submission example, covering real plugin source, building, running, behavior declarations, candidate packages and submission for review. Being an example does not mean the plugin has passed community review.
 
-## Start developing
+The plugin runs inside the host with `host-process-full-trust` and uses the `process-restart` lifecycle. Community review, publisher signatures and execution modes do not provide an operating-system sandbox.
 
-The root Maven project and each of the three `examples/` projects contain a Git-tracked `.pixivdownloader-plugin-project`. It identifies the selected project's format and proves neither identity nor safety; `sdk-project.json` separately pins the development environment. Plugin JARs, `.dev/`, and runtime archives do not contain the project marker.
+## Build
 
-Declare capabilities with comma-separated tokens in the package's `plugin.properties` field `pixiv.risk-signals`. The root, Gradle, and sbt examples use an explicit empty declaration. The download example declares `HOST_DATA_ACCESS` for its host-provided identity and task contexts. Update the declaration when adding behavior. Missing or empty declarations and scans with no findings are not safety guarantees or permission grants.
+Install JDK 17, Node.js 24 or newer, and Git. Run from this directory:
 
-Install JDK 17 and Node.js, with `java` and `node` on `PATH`. IDE import only resolves the project. Explicit Run / Debug compiles the current plugin, prepares the pinned runtime, and starts the full application. Build failure stops this sequence. Maven Wrapper obtains the pinned Maven version; no host checkout or manually copied host and plugin JARs are needed. Initial application configuration uses the host's setup flow.
+```powershell
+.\mvnw.cmd -B -ntp clean verify
+Get-FileHash -Algorithm SHA256 .\target\pixivdownload-plugin-douyin-1.0.0-rc.1.jar
+```
 
-| IDE | Import | Run | Debug |
-| --- | --- | --- | --- |
-| IntelliJ IDEA | Open the root `pom.xml` | Select `Developer Mode` and click Run | Select the same `Developer Mode` and click Debug |
-| VS Code | Open this directory and install the recommended Java Extension Pack | `Tasks: Run Task > Run Plugin` | `Run and Debug > Debug Plugin` |
-| Eclipse | `Import > Existing Maven Projects` | `eclipse/Run Plugin.launch` | `eclipse/Debug Plugin.launch` group |
+On Linux / macOS, use `sh ./mvnw -B -ntp clean verify`. The wrapper pins Maven; the first build downloads dependencies from Maven Central. `verify` runs Java, JavaScript and packaged-JAR checks. After an online build, use `-o clean verify` to rebuild offline and compare hashes.
 
-IntelliJ's `Developer Mode` is a native Application configuration. Before launch, Maven runs `test-compile exec:exec@sdk-prepare`. The IDE starts the JVM directly, running the host, bundled official plugins, and the current project's `target/classes` in that process. Set a breakpoint inside `ExampleMinimalPlugin.java`'s `routes()` and click Debug. No remote connection or fixed debug port is needed. The entry point in `src/test/java/sdk/DevelopmentLauncher.java` stays out of the plugin JAR. The run configuration adds the bundled tool to the launch classpath so Spring Boot can resolve nested JARs.
+Local commands validate development builds. For submission, use the `douyin-candidate` artifact from `Verify plugin` CI. The workflow pins the community build image digest, Maven 3.9.11 and Node.js 24.21.0, and compares two builds. JDK patch versions, operating-system line endings and file permissions affect package bytes; an ordinary Windows build is not a substitute for this candidate.
 
-This configuration explicitly enables plugin development mode. Current sources execute as `host-process-full-trust`, which the runtime status reports; the source descriptor stays unchanged. Each Run / Debug recompiles and loads the sources. Use `Stop Plugin` or stop the Application session to finish.
+The JAR contains only Douyin classes and resources; the host supplies SDK and framework classes. Host JavaScript test inputs in `src/test/fixtures/workbench/` are excluded from the JAR. Their provenance and hashes are recorded in `source.json`.
 
-VS Code, Eclipse, and the command-line tasks below validate the packaged artifact: they install the current JAR and preserve its declared execution mode. Their remote debugger uses `127.0.0.1:5005` by default, connecting to the worker for `declarative-process` or the host for `host-process-full-trust`. Use `Stop Plugin` or stop the entire group to finish; disconnecting only the remote debugger leaves the application running.
+Update both `pom.xml` and `src/main/resources/plugin.properties` when changing the plugin version. Maintain the SDK dependency separately. New prereleases use `alpha.N`, `beta.N` or `rc.N`. The published SDK identity `1.0.0-rc6` remains unchanged; `1.0.0-rc.6` is not an alias. SemVer 2.0.0 is a reference; the actual host and release tooling define compatibility and ordering.
 
-## Command line
-
-Windows:
+## Run and debug
 
 ```powershell
 .\mvnw.cmd verify exec:exec@sdk-run
-.\mvnw.cmd verify exec:exec@sdk-debug
 .\mvnw.cmd exec:exec@sdk-stop
 ```
 
-Linux / macOS:
+The first run downloads the full host archive pinned by `sdk-project.json` and verifies its SHA-256. Use the host setup page for initial configuration. Configuration, databases, downloads and logs live under this project's `.dev/`; runtime archives are cached under `~/.cache/pixivdownloader-sdk/`. For offline use, run `exec:exec@sdk-prepare` beforehand as well as caching Maven dependencies.
 
-```bash
-sh ./mvnw verify exec:exec@sdk-run
-sh ./mvnw verify exec:exec@sdk-debug
-sh ./mvnw exec:exec@sdk-stop
+In IntelliJ IDEA, open `pom.xml`, select `Developer Mode` and use Run or Debug, with source breakpoints in `DouyinPlugin.java`. The native Application configuration loads the current `target/classes`; the test-source launcher is excluded from the JAR. VS Code and Eclipse configurations in `.vscode/` and `eclipse/` run and remotely debug the packaged plugin.
+
+To run the built package without opening the GUI:
+
+```powershell
+java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar run . target/pixivdownload-plugin-douyin-1.0.0-rc.1.jar --no-gui
+java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar stop .
 ```
 
-`sdk-debug` waits for an IDE to attach; it does not open a debugger. Use `clean verify` to validate the plugin, or `exec:exec@sdk-prepare` to prepare only the runtime. The default artifact is `target/example-minimal-plugin-0.1.0.jar`.
+`tools/sdk-tools.jar`, `sdk-project.json`, `tools/community-contract.json` and `contracts/community/v1/` come from the same SDK release. Upgrade matching files together and revalidate the plugin. See the [SDK Javadocs](https://sywyar.github.io/PixivDownloader-Plugin-SDK/).
 
-After successfully building the current artifact, you can call the bundled tool directly:
+## Declared behavior and data
 
-```text
-java -jar tools/sdk-tools.jar run <absolute-project-path> <absolute-current-plugin-JAR> --no-gui
-java -jar tools/sdk-tools.jar debug <absolute-project-path> <absolute-current-plugin-JAR> --debug-port=5005
-java -jar tools/sdk-tools.jar stop <absolute-project-path>
-```
+The descriptor declares network access, file reads, writes and deletion, credential access and host data access. The plugin uses stable SDK interfaces for Douyin API, short-link and media requests, using configured Douyin credentials. It reads plugin settings, writes downloads, cleans temporary files and consumes host identity and task context. Configuration and database access use the plugin's owner scope. Declarations describe behavior; they do not grant permissions or prove complete scan coverage.
 
-`--debug-connect` connects to an IDE already listening. `run` / `debug` accept artifacts inside the project and outside `.dev/`, preserving their declared execution mode and confirming the current JAR's SHA-256 for local installation. Official plugins retain signature and provenance checks during both development and packaged validation. Choose a unique plugin ID to avoid conflicts with bundled plugins.
+Keep account cookies, private keys, `.dev/` and downloads out of Git. The development host uses separate state and does not migrate an existing installation's data.
 
-## Independent examples
+## Submit from the source repository
 
-| Directory | Purpose | Run / debug / stop |
-| --- | --- | --- |
-| `examples/download-type-plugin/` | Download types, queues, scheduled sources, and a plugin-owned gallery | From the SDK root: `mvnw -f examples/download-type-plugin/pom.xml verify exec:exec@sdk-run`; use `sdk-debug` to debug, or only `exec:exec@sdk-stop` to stop |
-| `examples/gradle-plugin/` | Build the basic feature plugin with Gradle | In that directory: `gradlew runPlugin`, `gradlew debugPlugin`, `gradlew stopPlugin` |
-| `examples/sbt-plugin/` | Build the same feature plugin with sbt | Install sbt, then run `sbt runPlugin` or `sbt debugPlugin` in that directory; stop from another terminal with `java -jar ../../tools/sdk-tools.jar stop .` |
+Follow the [community submission guide](https://github.com/Sywyar/PixivDownloader-community-plugins/blob/master/README_en.md#submissions-and-version-management) to prepare public source, upload the package and run the wizard. That guide maintains the submission command and general steps.
 
-Use `mvnw.cmd` / `gradlew.bat` on Windows, or `sh ./mvnw` / `sh ./gradlew` on Linux / macOS. Import each example separately. Each owns its `sdk-project.json` and `.dev/`, and uses the root `tools/sdk-tools.jar`. Gradle Wrapper pins 9.5.0; the sbt project pins 1.10.11. Gradle / sbt examples compile, package, and check JavaScript syntax. Maven projects also include JUnit and thin JAR checks.
+Use the candidate from `Verify plugin` CI for the source commit. Download `douyin-candidate` and extract its JAR and `SHA256SUMS` into this project's `target/`. Check that the CI head SHA matches the local commit and that the JAR hash matches the checksum file, then upload that JAR. Do not overwrite it with a local development build before submitting.
 
-## One SDK dependency
+Use these values in the wizard:
 
-```xml
-<dependency>
-    <groupId>io.github.sywyar.pixivdownloader</groupId>
-    <artifactId>pixivdownload-sdk</artifactId>
-    <version>1.0.0-rc6</version>
-    <scope>provided</scope>
-</dependency>
-```
+| Field | Selection or expected value |
+| --- | --- |
+| Project | This repository's root directory |
+| Build profile | `maven-java17-v1` |
+| Package | `target/pixivdownload-plugin-douyin-1.0.0-rc.1.jar` |
+| Plugin ID / version | `douyin` / `1.0.0-rc.1` |
+| Source repository Release | Public Pre-release, for example under tag `v1.0.0-rc.1` |
 
-Gradle uses `compileOnly("io.github.sywyar.pixivdownloader:pixivdownload-sdk:1.0.0-rc6")`. sbt uses `"io.github.sywyar.pixivdownloader" % "pixivdownload-sdk" % "1.0.0-rc6" % Provided`. Standard Ivy can map its compile configuration:
+Choose your own GitHub publisher identity and confirm the behavior declarations and license against the plugin.
 
-```xml
-<dependency org="io.github.sywyar.pixivdownloader" name="pixivdownload-sdk"
-            rev="1.0.0-rc6" conf="compile->default"/>
-```
+## Use the example for your own plugin
 
-Do not make Ivy's runtime configuration extend this compile configuration. Standard Maven metadata supplies public APIs and PF4J, Spring, Servlet, and Jackson compile dependencies. Produce a thin PF4J JAR without bundling these host-provided classes. Declare test frameworks separately. The three API modules and BOM remain individually available.
+| File or directory | What it demonstrates |
+| --- | --- |
+| `pom.xml` | One provided SDK dependency, tests, a thin JAR and fixed build inputs |
+| `src/main/resources/plugin.properties` | Plugin identity, SDK requirement, execution mode, lifecycle and behavior declarations |
+| `src/main/java/top/sywyar/pixivdownload/douyin/` | PF4J entry point, stable API contributions, configuration, HTTP, queues and scheduled sources |
+| `src/main/resources/static/`, `i18n/` | Plugin pages, static resources and localized text |
+| `src/test/` | Business regression, host dependency boundaries and packaged-artifact checks |
+| `.github/workflows/verify.yml` | The fixed community build environment, rebuild comparison and candidate artifacts |
 
-## Community formats and resources
+Fork and run it in a separate development environment to learn. To publish a new plugin, change the plugin ID, Maven artifactId, Java package and entry point, routes and resource URLs, i18n namespace, and corresponding tests and IDE references. Update behavior declarations to match your code. Retain the license and original notices when reusing code; do not copy publisher identities or keys. Improvements to Douyin itself should go through a source PR so its publisher can submit a new version.
 
-`contracts/community/v1/` contains the community JSON Schema, capability tokens, market categories and tags, license templates, and signature and data validation vectors. Consult `catalogs.json` when filling in `pixiv.risk-signals`. Choose a license template that fits your project; license declarations are not restricted to the template list.
+`sdk-project.json` and its matching tools identify the SDK environment, not your publisher account. Renaming your plugin does not justify rewriting those identities. The wizard generates submission JSON, signatures and hashes from the actual source and package. This example supplies no publisher records or private keys for reuse.
 
-`bundle-manifest.json` records each resource's size and SHA-256, along with tool versions. `tools/community-contract.json` records the SDK, source commit, contract version, resource manifest hash, and the size and hash of this `sdk-tools.jar`. Pin the complete release and its hashes when consuming these resources. Update tools and resources from the same release instead of replacing individual catalog files. These files belong to the development package's initial Git commit and stay out of plugin JARs and public Maven compile dependencies.
+## License
 
-## Runtime, cache, and project data
-
-`sdk-project.json` and the release-side `sdk-release.json` record the same SDK, host, official plugin manifest, and runtime ZIP identities, sizes, and SHA-256 hashes. The runtime ZIP is a separate SDK Release attachment. Explicit preparation downloads it once and reuses verified bytes in `~/.cache/pixivdownloader-sdk/`. Clearing the cache still selects the same bytes. Unavailable resources and hash mismatches fail.
-
-Every launch creates a private runtime copy and checks the host and each official plugin. The cache holds no application state. Project `.dev/` contains configuration, databases, logs, downloads, and run copies. Configuration and state are separated by runtime ZIP hash. Host and official plugin automatic updates are disabled in this environment; your regular installation's data is separate.
-
-After stopping, delete the project's `.dev/` to reset development data, including downloads stored there. Direct tool calls can select a cache with the JVM property `-Dpixivdownload.sdk.cache-dir=<directory>`; project runtime directories remain separate.
-
-Offline use requires both runtime preparation and cached build-tool dependencies. Maven uses `-o`; Gradle uses `--offline`. Incomplete caches fail. To update the SDK, use the new development package and matching manifest, then move your sources into it.
-
-On Windows, IntelliJ Application launch and source breakpoints have been tested, along with startup, pages, and normal shutdown for both Maven examples in the host process. The VS Code and Eclipse GUI flows have not been tested. During packaged validation, deep directories can still exceed Windows' working-directory limit when creating a worker; move to a shorter path if error 267 occurs. Other platforms declared by the runtime require verification on their own operating systems.
-
-## Customize the plugin
-
-The descriptor is `src/main/resources/plugin.properties`. Keep the plugin ID, Java package, routes, i18n namespace, version, and provider consistent. Maven runtime tasks use the actual `finalName`. Update the Eclipse configurations' project name if you rename the imported project.
-
-Stable contracts cover routes, static assets, i18n, navigation, Web UI slots, GUI configuration, download types, queues, scheduled sources, and notification templates. `examples/download-type-plugin/README_en.md` explains the five acquisition modes, cancellation and drain, credential policy, guards, and `gallery.type-switch`. Each plugin owns its gallery pages, APIs, assets, and data operations.
-
-Declare configuration through `GuiConfigContribution`. Use owner-bound `RuntimePathProvider` paths, `PluginDataSource` for private databases, and stable HTTP / WebSocket factories and route contracts. Do not depend on the app, plugin-runtime, installer, signature internals, host database, or concrete GUI provider. Verify contribution withdrawal on disable, unload, and reload in a real host.
+This project retains [AGPL-3.0](LICENSE). Its source comes from the Douyin module in [PixivDownloader](https://github.com/Sywyar/PixivDownloader). Bundled SDK tools and test inputs retain their original license notices.
