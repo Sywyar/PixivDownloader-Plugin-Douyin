@@ -3,5 +3,5 @@
   <stringAttribute key="M2_GOALS" value="exec:exec@sdk-stop" />
   <booleanAttribute key="M2_WORKSPACE_RESOLUTION" value="false" />
   <stringAttribute key="M2_RUNTIME" value="EMBEDDED" />
-  <stringAttribute key="org.eclipse.jdt.launching.WORKING_DIRECTORY" value="${workspace_loc:/example-minimal-plugin}" />
+  <stringAttribute key="org.eclipse.jdt.launching.WORKING_DIRECTORY" value="${workspace_loc:/pixivdownload-plugin-douyin}" />
 </launchConfiguration>

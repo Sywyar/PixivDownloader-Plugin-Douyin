@@ -1,0 +1,31 @@
+{
+  "repository": "https://github.com/Sywyar/PixivDownloader",
+  "commit": "2923d6bcfb74c9379629c2053ff1a0e42d09491d",
+  "path": "pixivdownload-plugin-download-workbench/src/main/resources/static/pixiv-batch",
+  "files": [
+    {
+      "file": "batch-queue-types-normalize.js",
+      "sha256": "a3c9e32bb814ef29773da412060b0a719c4adf81c6b0af45710a56cbcc4c0622"
+    },
+    {
+      "file": "batch-queue-types-runtime.js",
+      "sha256": "615c34780d76bba2771ff083bf11fb5ed7e515a5afcdb632b2bb4743d0a3907d"
+    },
+    {
+      "file": "batch-queue-types.js",
+      "sha256": "621d1ed4aa3b65ee100da28376380e517ff4ce25468df873a6b554983090dbb5"
+    },
+    {
+      "file": "batch-schedule-sources-normalize.js",
+      "sha256": "6500bc67bbb05dc53173c21b810e696515735fa3b7b02d184241daa71104ba13"
+    },
+    {
+      "file": "batch-schedule-sources-runtime.js",
+      "sha256": "7f59a14edf3099a3367886e66cf2600c05474465cf254f41b425a5ddd1e5a4e1"
+    },
+    {
+      "file": "batch-schedule-sources.js",
+      "sha256": "ef7e85e2a253687318a0213b32735cc72d70bfc57b8df43b7fbb20a62a98b417"
+    }
+  ]
+}

@@ -1,24 +1,31 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<?xml version='1.0' encoding='UTF-8'?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
-    <groupId>com.example.pixivdownload</groupId>
-    <artifactId>example-minimal-plugin</artifactId>
-    <version>0.1.0</version>
+    <groupId>io.github.sywyar</groupId>
+    <artifactId>pixivdownload-plugin-douyin</artifactId>
+    <version>1.0.0-rc.1</version>
     <packaging>jar</packaging>
-    <name>PixivDownload minimal external plugin example</name>
-    <description>Standalone thin PF4J plugin template using only the stable PixivDownload plugin API.</description>
-
+    <name>PixivDownloader Douyin Plugin</name>
+    <description>Douyin download, gallery and scheduled sources for PixivDownloader.</description>
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <pixivdownload.sdk.version>1.0.0-rc6</pixivdownload.sdk.version>
         <project.build.outputTimestamp>2000-01-01T00:00:00Z</project.build.outputTimestamp>
+        <maven.compiler.parameters>true</maven.compiler.parameters>
     </properties>
-
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>3.5.7</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>io.github.sywyar.pixivdownloader</groupId>
@@ -29,11 +36,41 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <version>5.12.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-launcher</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <version>1.4.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.47.1.0</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
-
     <build>
         <plugins>
             <plugin>
@@ -50,6 +87,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.4</version>
+                <configuration>
+                    <argLine>-Dfile.encoding=UTF-8 -Duser.language=en -Duser.country=US</argLine>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
@@ -58,7 +98,9 @@
                 <executions>
                     <execution>
                         <id>sdk-run</id>
-                        <goals><goal>exec</goal></goals>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
                         <configuration>
                             <executable>java</executable>
                             <arguments>
@@ -73,7 +115,9 @@
                     </execution>
                     <execution>
                         <id>sdk-debug</id>
-                        <goals><goal>exec</goal></goals>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
                         <configuration>
                             <executable>java</executable>
                             <arguments>
@@ -88,7 +132,9 @@
                     </execution>
                     <execution>
                         <id>sdk-debug-connect</id>
-                        <goals><goal>exec</goal></goals>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
                         <configuration>
                             <executable>java</executable>
                             <arguments>
@@ -104,7 +150,9 @@
                     </execution>
                     <execution>
                         <id>sdk-stop</id>
-                        <goals><goal>exec</goal></goals>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
                         <configuration>
                             <executable>java</executable>
                             <arguments>
@@ -118,7 +166,9 @@
                     </execution>
                     <execution>
                         <id>sdk-prepare</id>
-                        <goals><goal>exec</goal></goals>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
                         <configuration>
                             <executable>java</executable>
                             <arguments>
@@ -131,7 +181,7 @@
                         </configuration>
                     </execution>
                     <execution>
-                        <id>check-template-javascript-init</id>
+                        <id>test-javascript</id>
                         <phase>test</phase>
                         <goals>
                             <goal>exec</goal>
@@ -139,9 +189,10 @@
                         <configuration>
                             <executable>node</executable>
                             <arguments>
-                                <argument>--check</argument>
-                                <argument>${project.basedir}/src/main/resources/static/example-minimal/example-minimal-init.js</argument>
+                                <argument>--test</argument>
+                                <argument>src/test/js/*.test.js</argument>
                             </arguments>
+                            <skip>${skipTests}</skip>
                         </configuration>
                     </execution>
                 </executions>
@@ -152,8 +203,8 @@
                 <version>3.5.4</version>
                 <configuration>
                     <systemPropertyVariables>
-                        <example.buildDirectory>${project.build.directory}</example.buildDirectory>
-                        <example.finalName>${project.build.finalName}</example.finalName>
+                        <plugin.jar>${project.build.directory}/${project.build.finalName}.jar</plugin.jar>
+                        <plugin.version>${project.version}</plugin.version>
                     </systemPropertyVariables>
                 </configuration>
                 <executions>
@@ -164,6 +215,16 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <version>3.4.1</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
             </plugin>
         </plugins>
     </build>

@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Developer Mode" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="sdk.DevelopmentLauncher" />
-    <module name="example-minimal-plugin" />
+    <module name="pixivdownload-plugin-douyin" />
     <classpathModifications>
       <entry path="$PROJECT_DIR$/tools/sdk-tools.jar" />
     </classpathModifications>
