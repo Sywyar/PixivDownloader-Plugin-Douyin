@@ -1,21 +1,21 @@
 {
   "schemaVersion": 3,
-  "sdkVersion": "1.0.0-rc6",
+  "sdkVersion": "1.0.0-rc.7",
   "major": 1,
   "minor": 0,
   "patch": 0,
   "prereleaseChannel": "rc",
-  "prereleaseSequence": 6,
+  "prereleaseSequence": 7,
   "prerelease": true,
-  "releaseId": "sdk-api-v1.0.0-rc6",
+  "releaseId": "sdk-api-v1.0.0-rc.7",
   "sourceRepository": "https://github.com/Sywyar/PixivDownloader",
-  "sourceCommitSha": "e288be8797874783db44aa6fa1819cf8d48ab03c",
+  "sourceCommitSha": "a1faeb618755af2352e2b5334a7dbf92163497d6",
   "minimumVerifiedHostRelease": null,
   "verifiedHostSourceSha": null,
   "javaVersion": 17,
   "developmentRuntime": {
     "hostVersion": "1.0.0",
-    "hostSourceCommitSha": "e288be8797874783db44aa6fa1819cf8d48ab03c",
+    "hostSourceCommitSha": "a1faeb618755af2352e2b5334a7dbf92163497d6",
     "platforms": [
       "windows-x64",
       "windows-arm64",
@@ -23,16 +23,16 @@
       "linux-arm64",
       "macos-arm64"
     ],
-    "downloadUrl": "https://github.com/Sywyar/PixivDownloader-Plugin-SDK/releases/download/sdk-api-v1.0.0-rc6/PixivDownload-1.0.0-full-offline.zip",
+    "downloadUrl": "https://github.com/Sywyar/PixivDownloader-Plugin-SDK/releases/download/sdk-api-v1.0.0-rc.7/PixivDownload-1.0.0-full-offline.zip",
     "archive": {
       "file": "PixivDownload-1.0.0-full-offline.zip",
-      "size": 150724706,
-      "sha256": "d83c6b1002d69f3900f9a0d9845286cfa6bd59c686a908a0a8d34678c2941fa5"
+      "size": 150736476,
+      "sha256": "98d3ba7825a7b7395a3158986efb0feef8e4207940f548545923fc29de89c37a"
     },
     "host": {
       "file": "PixivDownload-1.0.0.jar",
-      "size": 53343311,
-      "sha256": "90a0956c2f23b33efd4cc74a3285794c0e24ba83fccce7838146d94f1631f8cf"
+      "size": 53356175,
+      "sha256": "ef2e33e0985c65b9c0e0fb37c245d03b912eed5305a3dbc4295fba7de29d2547"
     },
     "pluginsManifest": {
       "file": "plugins-manifest.json",
@@ -44,31 +44,31 @@
     {
       "groupId": "io.github.sywyar.pixivdownloader",
       "artifactId": "pixivdownload-sdk-info",
-      "version": "1.0.0-rc6",
+      "version": "1.0.0-rc.7",
       "packaging": "jar"
     },
     {
       "groupId": "io.github.sywyar.pixivdownloader",
       "artifactId": "pixivdownload-plugin-api",
-      "version": "1.0.0-rc6",
+      "version": "1.0.0-rc.7",
       "packaging": "jar"
     },
     {
       "groupId": "io.github.sywyar.pixivdownloader",
       "artifactId": "pixivdownload-core-api",
-      "version": "1.0.0-rc6",
+      "version": "1.0.0-rc.7",
       "packaging": "jar"
     },
     {
       "groupId": "io.github.sywyar.pixivdownloader",
       "artifactId": "pixivdownload-sdk-bom",
-      "version": "1.0.0-rc6",
+      "version": "1.0.0-rc.7",
       "packaging": "pom"
     },
     {
       "groupId": "io.github.sywyar.pixivdownloader",
       "artifactId": "pixivdownload-sdk",
-      "version": "1.0.0-rc6",
+      "version": "1.0.0-rc.7",
       "packaging": "jar"
     }
   ]
