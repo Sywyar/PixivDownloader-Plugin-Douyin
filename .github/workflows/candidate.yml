@@ -135,10 +135,15 @@ jobs:
             const releases = await github.paginate(github.rest.repos.listReleases, {...context.repo, per_page: 100});
             for (const {c, metadata, file, tag} of prepared) {
               // 草稿尚未创建 tag 时允许缺失；现存 tag 必须实际解析到该提交。
+              let tagExists = true;
               try {
+                const ref = (await github.rest.git.getRef({...context.repo, ref: `tags/${tag}`})).data;
+                if (ref.ref !== `refs/tags/${tag}`) throw new Error('CANDIDATE_TAG_CHANGED');
+              } catch (error) { if (error.status === 404) tagExists = false; else throw error; }
+              if (tagExists) {
                 const commit = (await github.rest.repos.getCommit({...context.repo, ref: `refs/tags/${tag}`})).data;
                 if (commit.sha !== context.sha) throw new Error('CANDIDATE_TAG_CHANGED');
-              } catch (error) { if (error.status !== 404) throw error; }
+              }
               const bytes = read(file, maximum);
               if (bytes.length !== c.artifact.size || digest(bytes) !== c.artifact.sha256) throw new Error('CANDIDATE_BYTES_CHANGED');
               const matches = releases.filter(release => release.tag_name === tag);
@@ -148,6 +153,7 @@ jobs:
                 target_commitish: context.sha, name: `${repo.owner.login} / ${c.pluginId} ${c.version}`,
                 body: `Source candidate for ${context.sha}. Community review is required.`, draft: true, prerelease: true, make_latest: 'false'})).data;
               if (release.target_commitish !== context.sha || !release.prerelease) throw new Error('CANDIDATE_RELEASE_CONFLICT');
+              if (!release.draft && !tagExists) throw new Error('CANDIDATE_TAG_CHANGED');
               const assets = await github.paginate(github.rest.repos.listReleaseAssets, {...context.repo, release_id: release.id, per_page: 100});
               if (assets.some(asset => ![c.artifact.file, 'source-candidate.json'].includes(asset.name))) throw new Error('CANDIDATE_ASSET_CONFLICT');
               for (const [name, data] of [[c.artifact.file, bytes], ['source-candidate.json', metadata]]) {
