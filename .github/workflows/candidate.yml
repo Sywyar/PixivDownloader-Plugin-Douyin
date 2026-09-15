@@ -107,10 +107,13 @@ jobs:
                 || String(run.repository.id) !== String(repo.id)) throw new Error('CANDIDATE_SOURCE_MISMATCH');
             const folders = fs.readdirSync('candidates', {withFileTypes: true});
             if (!folders.length || folders.length > 32) throw new Error('CANDIDATE_COUNT_INVALID');
-            const prepared = [];
-            for (const folder of folders) {
+            // 下载 Action 对单个 artifact 直接展开，对多个 artifact 分目录展开。
+            const directories = fs.existsSync('candidates/source-candidate.json') ? ['candidates'] : folders.map(folder => {
               if (!folder.isDirectory()) throw new Error('CANDIDATE_PATH_INVALID');
-              const directory = path.join('candidates', folder.name);
+              return path.join('candidates', folder.name);
+            });
+            const prepared = [];
+            for (const directory of directories) {
               const metadata = read(path.join(directory, 'source-candidate.json'), 64 * 1024);
               const c = JSON.parse(metadata.toString('utf8'));
               if (c.schemaVersion !== 1 || c.repository !== repo.full_name || c.repositoryId !== String(repo.id)
