@@ -2,7 +2,7 @@
 
 [简体中文](README.md)
 
-Adds Douyin downloads, queue operations, a gallery and scheduled sources to PixivDownloader. The plugin ID is `douyin`, its version is `1.0.0-rc.1`, and its only production dependency is the published `io.github.sywyar.pixivdownloader:pixivdownload-sdk:1.0.0-rc6`. No host source checkout is required.
+Adds Douyin downloads, queue operations, a gallery and scheduled sources to PixivDownloader. The plugin ID is `douyin`, its version is `1.0.0-rc.1`, and its only production dependency is the published `io.github.sywyar.pixivdownloader:pixivdownload-sdk` declared in `pom.xml`. No host source checkout is required.
 
 This repository also serves as a complete community submission example, covering real plugin source, building, running, behavior declarations, candidate packages and submission for review. Being an example does not mean the plugin has passed community review.
 
@@ -17,13 +17,13 @@ Install JDK 17, Node.js 24 or newer, and Git. Run from this directory:
 Get-FileHash -Algorithm SHA256 .\target\pixivdownload-plugin-douyin-1.0.0-rc.1.jar
 ```
 
-On Linux / macOS, use `sh ./mvnw -B -ntp clean verify`. The wrapper pins Maven; the first build downloads dependencies from Maven Central. `verify` runs Java, JavaScript and packaged-JAR checks. After an online build, use `-o clean verify` to rebuild offline and compare hashes.
+On Linux / macOS, use `./mvnw -B -ntp clean verify`. The wrapper pins Maven; the first build downloads dependencies from Maven Central. `verify` runs Java, JavaScript and packaged-JAR checks. After an online build, use `-o clean verify` to rebuild offline and compare hashes.
 
-Local commands validate development builds. For submission, use the `douyin-candidate` artifact from `Verify plugin` CI. The workflow pins the community build image digest, Maven 3.9.11 and Node.js 24.21.0, and compares two builds. JDK patch versions, operating-system line endings and file permissions affect package bytes; an ordinary Windows build is not a substitute for this candidate.
+Local commands validate development builds. The SDK's `Plugin candidate` CI builds and tests in a pinned environment, compares offline rebuild hashes, and archives the candidate in this source repository's Draft Release. The wizard reads that candidate. JDK patch versions, operating-system line endings and file permissions can affect package bytes; an ordinary Windows build is not a substitute.
 
 The JAR contains only Douyin classes and resources; the host supplies SDK and framework classes. Host JavaScript test inputs in `src/test/fixtures/workbench/` are excluded from the JAR. Their provenance and hashes are recorded in `source.json`.
 
-Update both `pom.xml` and `src/main/resources/plugin.properties` when changing the plugin version. Maintain the SDK dependency separately. New prereleases use `alpha.N`, `beta.N` or `rc.N`. The published SDK identity `1.0.0-rc6` remains unchanged; `1.0.0-rc.6` is not an alias. SemVer 2.0.0 is a reference; the actual host and release tooling define compatibility and ordering.
+Update both `pom.xml` and `src/main/resources/plugin.properties` when changing the plugin version. Maintain the SDK dependency separately. New prereleases use `alpha.N`, `beta.N` or `rc.N`; historical release identities remain unchanged. SemVer 2.0.0 is a reference; the actual host and release tooling define compatibility and ordering.
 
 ## Run and debug
 
@@ -43,7 +43,7 @@ java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar run . target/pixivdownload
 java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar stop .
 ```
 
-`tools/sdk-tools.jar`, `sdk-project.json`, `tools/community-contract.json` and `contracts/community/v1/` come from the same SDK release. Upgrade matching files together and revalidate the plugin. See the [SDK Javadocs](https://sywyar.github.io/PixivDownloader-Plugin-SDK/).
+`tools/`, `sdk-project.json`, `contracts/community/v1/`, the Wrapper and candidate workflow come from the same SDK release. Upgrade matching files and the SDK dependency in `pom.xml` together, then revalidate the plugin. See the [SDK Javadocs](https://sywyar.github.io/PixivDownloader-Plugin-SDK/).
 
 ## Declared behavior and data
 
@@ -53,19 +53,17 @@ Keep account cookies, private keys, `.dev/` and downloads out of Git. The develo
 
 ## Submit from the source repository
 
-Follow the [community submission guide](https://github.com/Sywyar/PixivDownloader-community-plugins/blob/master/README_en.md#submissions-and-version-management) to prepare public source, upload the package and run the wizard. That guide maintains the submission command and general steps.
-
-Use the candidate from `Verify plugin` CI for the source commit. Download `douyin-candidate` and extract its JAR and `SHA256SUMS` into this project's `target/`. Check that the CI head SHA matches the local commit and that the JAR hash matches the checksum file, then upload that JAR. Do not overwrite it with a local development build before submitting.
+Push the source to the default branch, wait for every `Plugin candidate` job to pass, then run the wizard using the [community submission guide](https://github.com/Sywyar/PixivDownloader-community-plugins/blob/master/README_en.md#submissions-and-version-management). Keep your working tree clean and on the same commit as CI. You do not need to download artifacts, create a Release or upload packages yourself. That guide maintains the submission command, cache recovery and general steps.
 
 Use these values in the wizard:
 
 | Field | Selection or expected value |
 | --- | --- |
 | Project | This repository's root directory |
-| Build profile | `maven-java17-v1` |
-| Package | `target/pixivdownload-plugin-douyin-1.0.0-rc.1.jar` |
+| Build profile | Automatically detected as Maven (`maven-java17-v1`) |
+| Package | Read from the CI candidate for this source commit |
 | Plugin ID / version | `douyin` / `1.0.0-rc.1` |
-| Source repository Release | Public Pre-release, for example under tag `v1.0.0-rc.1` |
+| Source repository Release | CI creates a Draft; the wizard publishes it as a Pre-release after final submission confirmation |
 
 Choose your own GitHub publisher identity and confirm the behavior declarations and license against the plugin.
 
@@ -78,7 +76,7 @@ Choose your own GitHub publisher identity and confirm the behavior declarations 
 | `src/main/java/top/sywyar/pixivdownload/douyin/` | PF4J entry point, stable API contributions, configuration, HTTP, queues and scheduled sources |
 | `src/main/resources/static/`, `i18n/` | Plugin pages, static resources and localized text |
 | `src/test/` | Business regression, host dependency boundaries and packaged-artifact checks |
-| `.github/workflows/verify.yml` | The fixed community build environment, rebuild comparison and candidate artifacts |
+| `.github/workflows/candidate.yml` | SDK candidate builds, offline rebuild comparison and source Draft archival |
 
 Fork and run it in a separate development environment to learn. To publish a new plugin, change the plugin ID, Maven artifactId, Java package and entry point, routes and resource URLs, i18n namespace, and corresponding tests and IDE references. Update behavior declarations to match your code. Retain the license and original notices when reusing code; do not copy publisher identities or keys. Improvements to Douyin itself should go through a source PR so its publisher can submit a new version.
 
