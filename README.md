@@ -19,7 +19,7 @@ Get-FileHash -Algorithm SHA256 .\target\pixivdownload-plugin-douyin-1.0.0-rc.1.j
 
 Linux / macOS 使用 `./mvnw -B -ntp clean verify`。Wrapper 固定 Maven 版本；首次构建从 Maven Central 下载依赖。`verify` 执行 Java、JavaScript 和最终 JAR 检查。在线构建后可执行 `-o clean verify` 离线重建并比较摘要。
 
-本地命令用于开发验证。投稿候选由 SDK 提供的 `Plugin candidate` CI 在固定环境中构建、测试并比较离线重建摘要，再自动归档到本源码仓库的 Draft Release。向导读取该候选；JDK 补丁版本、操作系统换行和文件权限可能改变包字节，普通 Windows 构建包不能代替它。
+本地命令用于开发验证。投稿候选由 SDK 提供的 `Plugin candidate` CI 在固定环境中构建、测试并比较离线重建摘要，再写入本仓库的 `candidate-douyin` 草稿；后续构建复用此草稿并覆盖产物。向导读取该候选；JDK 补丁版本、操作系统换行和文件权限可能改变包字节，普通 Windows 构建包不能代替它。
 
 产物只包含 Douyin 类和资源，SDK 与框架类由宿主提供。`src/test/fixtures/workbench/` 中的宿主 JavaScript 测试输入不进入 JAR，来源和摘要见该目录的 `source.json`。
 
@@ -43,7 +43,7 @@ java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar run . target/pixivdownload
 java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar stop .
 ```
 
-`tools/`、`sdk-project.json`、`contracts/community/v1/`、Wrapper 和候选 workflow 来自同一 SDK 发行物。升级时一并更新匹配文件与 `pom.xml` 的 SDK 依赖，再重新验证插件。[SDK Javadocs](https://sywyar.github.io/PixivDownloader-Plugin-SDK/) 提供 API 文档。
+`tools/`、`sdk-project.json`、`contracts/community/v1/` 和 Wrapper 来自同一 SDK 发行物。升级 SDK 时一并更新匹配文件与 `pom.xml` 的 SDK 依赖，再重新验证插件。候选 workflow 的维护修复可单独同步，须保持候选数据与工具兼容。[SDK Javadocs](https://sywyar.github.io/PixivDownloader-Plugin-SDK/) 提供 API 文档。
 
 ## 能力声明与数据
 
@@ -63,7 +63,7 @@ java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar stop .
 | 构建配置 | 自动识别为 Maven（`maven-java17-v1`） |
 | 插件包 | 从本次源码提交的 CI 候选读取 |
 | 插件 ID / 版本 | `douyin` / `1.0.0-rc.1` |
-| 源码仓库 Release | CI 自动创建 Draft；最终投稿确认后由向导公开为 Pre-release |
+| 源码仓库 Release | CI 复用一个 Draft 并覆盖产物；确认投稿后，向导另存固定 Pre-release，后续构建不覆盖已投稿的包 |
 
 发布者选择自己的 GitHub 身份，按实际行为确认能力声明和许可证。
 

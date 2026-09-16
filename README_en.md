@@ -19,7 +19,7 @@ Get-FileHash -Algorithm SHA256 .\target\pixivdownload-plugin-douyin-1.0.0-rc.1.j
 
 On Linux / macOS, use `./mvnw -B -ntp clean verify`. The wrapper pins Maven; the first build downloads dependencies from Maven Central. `verify` runs Java, JavaScript and packaged-JAR checks. After an online build, use `-o clean verify` to rebuild offline and compare hashes.
 
-Local commands validate development builds. The SDK's `Plugin candidate` CI builds and tests in a pinned environment, compares offline rebuild hashes, and archives the candidate in this source repository's Draft Release. The wizard reads that candidate. JDK patch versions, operating-system line endings and file permissions can affect package bytes; an ordinary Windows build is not a substitute.
+Local commands validate development builds. The SDK's `Plugin candidate` CI builds and tests in a pinned environment, compares offline rebuild hashes, and writes to this repository's `candidate-douyin` Draft. Later builds reuse that Draft and replace its assets. The wizard reads that candidate. JDK patch versions, operating-system line endings and file permissions can affect package bytes; an ordinary Windows build is not a substitute.
 
 The JAR contains only Douyin classes and resources; the host supplies SDK and framework classes. Host JavaScript test inputs in `src/test/fixtures/workbench/` are excluded from the JAR. Their provenance and hashes are recorded in `source.json`.
 
@@ -43,7 +43,7 @@ java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar run . target/pixivdownload
 java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar stop .
 ```
 
-`tools/`, `sdk-project.json`, `contracts/community/v1/`, the Wrapper and candidate workflow come from the same SDK release. Upgrade matching files and the SDK dependency in `pom.xml` together, then revalidate the plugin. See the [SDK Javadocs](https://sywyar.github.io/PixivDownloader-Plugin-SDK/).
+`tools/`, `sdk-project.json`, `contracts/community/v1/` and the Wrapper come from the same SDK release. When upgrading the SDK, update matching files and the SDK dependency in `pom.xml` together, then revalidate the plugin. Candidate workflow maintenance fixes can be applied separately while preserving compatibility with the candidate data and tools. See the [SDK Javadocs](https://sywyar.github.io/PixivDownloader-Plugin-SDK/).
 
 ## Declared behavior and data
 
@@ -63,7 +63,7 @@ Use these values in the wizard:
 | Build profile | Automatically detected as Maven (`maven-java17-v1`) |
 | Package | Read from the CI candidate for this source commit |
 | Plugin ID / version | `douyin` / `1.0.0-rc.1` |
-| Source repository Release | CI creates a Draft; the wizard publishes it as a Pre-release after final submission confirmation |
+| Source repository Release | CI reuses one Draft and replaces its assets; after confirmation, the wizard saves a fixed pre-release that later builds do not overwrite |
 
 Choose your own GitHub publisher identity and confirm the behavior declarations and license against the plugin.
 
