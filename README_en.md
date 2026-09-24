@@ -2,7 +2,7 @@
 
 [简体中文](README.md)
 
-Adds Douyin downloads, queue operations, a gallery and scheduled sources to PixivDownloader. The plugin ID is `douyin`, its version is `1.0.0-rc.1`, and its only production dependency is the published `io.github.sywyar.pixivdownloader:pixivdownload-sdk` declared in `pom.xml`. No host source checkout is required.
+Adds Douyin downloads, queue operations, a gallery and scheduled sources to PixivDownloader. The plugin ID is `douyin`, its version is `1.0.0-rc.2`, and its only production dependency is the published `io.github.sywyar.pixivdownloader:pixivdownload-sdk` declared in `pom.xml`. No host source checkout is required.
 
 This repository also serves as a complete community submission example, covering real plugin source, building, running, behavior declarations, candidate packages and submission for review. Being an example does not mean the plugin has passed community review.
 
@@ -14,7 +14,7 @@ Install JDK 17, Node.js 24 or newer, and Git. Run from this directory:
 
 ```powershell
 .\mvnw.cmd -B -ntp clean verify
-Get-FileHash -Algorithm SHA256 .\target\pixivdownload-plugin-douyin-1.0.0-rc.1.jar
+Get-FileHash -Algorithm SHA256 .\target\pixivdownload-plugin-douyin-1.0.0-rc.2.jar
 ```
 
 On Linux / macOS, use `./mvnw -B -ntp clean verify`. The wrapper pins Maven; the first build downloads dependencies from Maven Central. `verify` runs Java, JavaScript and packaged-JAR checks. After an online build, use `-o clean verify` to rebuild offline and compare hashes.
@@ -39,7 +39,7 @@ In IntelliJ IDEA, open `pom.xml`, select `Developer Mode` and use Run or Debug, 
 To run the built package without opening the GUI:
 
 ```powershell
-java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar run . target/pixivdownload-plugin-douyin-1.0.0-rc.1.jar --no-gui
+java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar run . target/pixivdownload-plugin-douyin-1.0.0-rc.2.jar --no-gui
 java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar stop .
 ```
 
@@ -62,7 +62,7 @@ Use these values in the wizard:
 | Project | This repository's root directory |
 | Build profile | Automatically detected as Maven (`maven-java17-v1`) |
 | Package | Read from the CI candidate for this source commit |
-| Plugin ID / version | `douyin` / `1.0.0-rc.1` |
+| Plugin ID / version | `douyin` / `1.0.0-rc.2` |
 | Source repository Release | CI reuses one Draft and replaces its assets; after confirmation, the wizard saves a fixed pre-release that later builds do not overwrite |
 
 Choose your own GitHub publisher identity and confirm the behavior declarations and license against the plugin.

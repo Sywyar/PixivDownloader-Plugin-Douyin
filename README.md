@@ -2,7 +2,7 @@
 
 [English](README_en.md)
 
-为 PixivDownloader 提供抖音作品下载、队列操作、画廊和计划来源。插件 ID 为 `douyin`，版本为 `1.0.0-rc.1`，仅通过 `pom.xml` 声明的已发布 `io.github.sywyar.pixivdownloader:pixivdownload-sdk` 取得生产依赖，无需克隆主程序源码。
+为 PixivDownloader 提供抖音作品下载、队列操作、画廊和计划来源。插件 ID 为 `douyin`，版本为 `1.0.0-rc.2`，仅通过 `pom.xml` 声明的已发布 `io.github.sywyar.pixivdownloader:pixivdownload-sdk` 取得生产依赖，无需克隆主程序源码。
 
 本仓库也作为完整社区投稿示例：开发者可以从实际插件源码开始，学习构建、运行、能力声明、生成候选包和提交审核。示例身份不表示插件已经通过社区审核。
 
@@ -14,7 +14,7 @@
 
 ```powershell
 .\mvnw.cmd -B -ntp clean verify
-Get-FileHash -Algorithm SHA256 .\target\pixivdownload-plugin-douyin-1.0.0-rc.1.jar
+Get-FileHash -Algorithm SHA256 .\target\pixivdownload-plugin-douyin-1.0.0-rc.2.jar
 ```
 
 Linux / macOS 使用 `./mvnw -B -ntp clean verify`。Wrapper 固定 Maven 版本；首次构建从 Maven Central 下载依赖。`verify` 执行 Java、JavaScript 和最终 JAR 检查。在线构建后可执行 `-o clean verify` 离线重建并比较摘要。
@@ -39,7 +39,7 @@ IntelliJ IDEA 打开 `pom.xml` 后选择 `Developer Mode`，即可 Run / Debug �
 只运行已构建包且不打开 GUI：
 
 ```powershell
-java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar run . target/pixivdownload-plugin-douyin-1.0.0-rc.1.jar --no-gui
+java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar run . target/pixivdownload-plugin-douyin-1.0.0-rc.2.jar --no-gui
 java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar stop .
 ```
 
@@ -62,7 +62,7 @@ java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar stop .
 | 工程 | 当前仓库根目录 |
 | 构建配置 | 自动识别为 Maven（`maven-java17-v1`） |
 | 插件包 | 从本次源码提交的 CI 候选读取 |
-| 插件 ID / 版本 | `douyin` / `1.0.0-rc.1` |
+| 插件 ID / 版本 | `douyin` / `1.0.0-rc.2` |
 | 源码仓库 Release | CI 复用一个 Draft 并覆盖产物；确认投稿后，向导另存固定 Pre-release，后续构建不覆盖已投稿的包 |
 
 发布者选择自己的 GitHub 身份，按实际行为确认能力声明和许可证。

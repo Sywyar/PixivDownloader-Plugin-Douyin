@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.sywyar</groupId>
     <artifactId>pixivdownload-plugin-douyin</artifactId>
-    <version>1.0.0-rc.1</version>
+    <version>1.0.0-rc.2</version>
     <packaging>jar</packaging>
     <name>PixivDownloader Douyin Plugin</name>
     <description>Douyin download, gallery and scheduled sources for PixivDownloader.</description>
