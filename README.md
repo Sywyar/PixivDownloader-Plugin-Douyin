@@ -2,7 +2,7 @@
 
 [English](README_en.md)
 
-为 PixivDownloader 提供抖音作品下载、队列操作、画廊和计划来源。插件 ID 为 `douyin`，版本为 `1.0.0-rc.3`，仅通过 `pom.xml` 声明的已发布 `io.github.sywyar.pixivdownloader:pixivdownload-sdk` 取得生产依赖，无需克隆主程序源码。
+为 PixivDownloader 提供抖音作品下载、队列操作、画廊和计划来源。插件 ID 为 `douyin`，版本为 `1.0.0-rc.4`，生产代码只依赖 `pom.xml` 中声明的 `io.github.sywyar.pixivdownloader:pixivdownload-sdk`，最低运行 SDK 为 `1.3`。
 
 本仓库也作为完整社区投稿示例：开发者可以从实际插件源码开始，学习构建、运行、能力声明、生成候选包和提交审核。示例身份不表示插件已经通过社区审核。
 
@@ -14,10 +14,10 @@
 
 ```powershell
 .\mvnw.cmd -B -ntp clean verify
-Get-FileHash -Algorithm SHA256 .\target\pixivdownload-plugin-douyin-1.0.0-rc.3.jar
+Get-FileHash -Algorithm SHA256 .\target\pixivdownload-plugin-douyin-1.0.0-rc.4.jar
 ```
 
-Linux / macOS 使用 `./mvnw -B -ntp clean verify`。Wrapper 固定 Maven 版本；首次构建从 Maven Central 下载依赖。`verify` 执行 Java、JavaScript 和最终 JAR 检查。在线构建后可执行 `-o clean verify` 离线重建并比较摘要。
+Linux / macOS 使用 `./mvnw -B -ntp clean verify`。Wrapper 固定 Maven 版本，构建依赖由 `pom.xml` 声明。`verify` 执行 Java、JavaScript 和最终 JAR 检查。在线构建后可执行 `-o clean verify` 离线重建并比较摘要。
 
 本地命令用于开发验证。投稿候选由 SDK 提供的 `Plugin candidate` CI 在固定环境中构建、测试并比较离线重建摘要，再写入本仓库的 `candidate-douyin` 草稿；后续构建复用此草稿并覆盖产物。向导读取该候选；JDK 补丁版本、操作系统换行和文件权限可能改变包字节，普通 Windows 构建包不能代替它。
 
@@ -26,6 +26,8 @@ Linux / macOS 使用 `./mvnw -B -ntp clean verify`。Wrapper 固定 Maven 版本
 修改插件版本时同步更新 `pom.xml` 和 `src/main/resources/plugin.properties`。插件版本与 SDK 依赖分别维护，新预发布后缀采用 `alpha.N`、`beta.N`、`rc.N`，历史发行身份不改写。SemVer 2.0.0 仅作参考，兼容性与排序以实际宿主及发布链路为准。
 
 ## 运行与调试
+
+运行与调试所用的 SDK 开发包须满足 `plugin.properties` 的 SDK 要求，并与 `pom.xml` 中的编译依赖匹配。
 
 ```powershell
 .\mvnw.cmd verify exec:exec@sdk-run
@@ -39,11 +41,44 @@ IntelliJ IDEA 打开 `pom.xml` 后选择 `Developer Mode`，即可 Run / Debug �
 只运行已构建包且不打开 GUI：
 
 ```powershell
-java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar run . target/pixivdownload-plugin-douyin-1.0.0-rc.3.jar --no-gui
+java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar run . target/pixivdownload-plugin-douyin-1.0.0-rc.4.jar --no-gui
 java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar stop .
 ```
 
 `tools/`、`sdk-project.json`、`contracts/community/v1/` 和 Wrapper 来自同一 SDK 发行物。升级 SDK 时一并更新匹配文件与 `pom.xml` 的 SDK 依赖，再重新验证插件。候选 workflow 的维护修复可单独同步，须保持候选数据与工具兼容。[SDK Javadocs](https://sywyar.github.io/PixivDownloader-Plugin-SDK/) 提供 API 文档。
+
+## 私有数据库
+
+`DouyinPlugin.privateSchema()` 声明作品、文件明细和来源关系三张表，`privateStorageMigrations()` 声明一次性的旧作品来源补全。宿主在创建业务 Bean 前完成结构初始化和转换，并绑定 `douyin` 的私库存储身份。`DouyinHistoryMapper` 通过 `PluginDatabase` 表达查询、写入、唯一键冲突和事务，不包含数据库品牌判断或 SQL。
+
+SQLite 提供者保留 `data/douyin/plugin.db`，PostgreSQL 提供者映射独立 owner schema；实际位置和连接由宿主及提供者管理。作品、文件和来源关系在同一事务内提交；重复来源保留首次已知顺序及最早发现时间。历史路径继续使用 `{douyin}` 编码，凭证不写入这些表。
+
+升级旧 SQLite 库会补全已知来源，已有来源关系保持不变。跨数据库切换必须先通过宿主停机迁移和核验；安装新插件不等于迁移成功。迁移失败保留源数据，不能通过删除私库或绕过收据检查完成切换。数据库不可用时业务 Bean 可以装配，实际读写明确失败，不把空结果当作历史已清空。
+
+其他插件可以参考这两个声明入口和 mapper 的中性操作。业务含义变化由所属插件声明转换，新增实现相同存储契约的提供者不要求业务插件增加方言分支。
+
+### 存储验证
+
+普通 `verify` 使用真实 SQLite 的独立测试夹具。正式提供者验证另行传入数据库插件 JAR，测试代码通过公开 SDK 加载它，不把提供者或驱动打入 Douyin 包：
+
+```powershell
+mvn test '-Dtest=DouyinHistoryServiceTest,DouyinNeutralStorageTest,DouyinStorageMigrationTest' `
+  "-Ddouyin.test.provider.jar=$sqliteProviderJar" `
+  '-Ddouyin.test.provider.class=top.sywyar.pixivdownload.databasesqlite.SqliteDatabasePlugin'
+```
+
+PostgreSQL 测试先设置 `DOUYIN_TEST_POSTGRES_URL`、`DOUYIN_TEST_POSTGRES_USER`、`DOUYIN_TEST_POSTGRES_PASSWORD`，URL 使用隔离测试库的基础地址，不带查询参数。测试会创建并删除随机 schema。然后运行：
+
+```powershell
+mvn test '-Dtest=DouyinHistoryServiceTest,DouyinNeutralStorageTest,DouyinStorageMigrationTest#providerMigration' `
+  "-Ddouyin.test.provider.jar=$postgresProviderJar" `
+  '-Ddouyin.test.provider.class=top.sywyar.pixivdownload.databasepostgresql.PostgresDatabasePlugin' `
+  "-Ddouyin.test.sqlite.jar=$sqliteProviderJar" `
+  "-Ddouyin.test.migration-target.jar=$postgresProviderJar" `
+  '-Ddouyin.test.migration-target.class=top.sywyar.pixivdownload.databasepostgresql.PostgresDatabasePlugin'
+```
+
+未提供 JAR 时，提供者迁移测试会报告跳过；这不能作为正式提供者验证通过的依据。
 
 ## 能力声明与数据
 
@@ -62,7 +97,7 @@ java '-Dfile.encoding=UTF-8' -jar tools/sdk-tools.jar stop .
 | 工程 | 当前仓库根目录 |
 | 构建配置 | 自动识别为 Maven（`maven-java17-v1`） |
 | 插件包 | 从本次源码提交的 CI 候选读取 |
-| 插件 ID / 版本 | `douyin` / `1.0.0-rc.3` |
+| 插件 ID / 版本 | `douyin` / `1.0.0-rc.4` |
 | 源码仓库 Release | CI 复用一个 Draft 并覆盖产物；确认投稿后，向导另存固定 Pre-release，后续构建不覆盖已投稿的包 |
 
 发布者选择自己的 GitHub 身份，按实际行为确认能力声明和许可证。

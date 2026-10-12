@@ -1,5 +1,8 @@
 package top.sywyar.pixivdownload.douyin;
 
+import top.sywyar.pixivdownload.douyin.db.history.DouyinHistorySchema;
+import top.sywyar.pixivdownload.plugin.api.schema.SchemaContribution;
+import top.sywyar.pixivdownload.plugin.api.storage.relational.StorageMigration;
 import top.sywyar.pixivdownload.douyin.schedule.source.DouyinScheduledSourceDescriptors;
 import top.sywyar.pixivdownload.douyin.settings.DouyinPluginSettingsService;
 import top.sywyar.pixivdownload.plugin.api.download.type.DownloadAcquisitionMode;
@@ -41,6 +44,16 @@ public class DouyinPlugin implements PixivFeaturePlugin {
     @Override
     public String id() {
         return ID;
+    }
+
+    @Override
+    public List<SchemaContribution> privateSchema() {
+        return DouyinHistorySchema.contributions();
+    }
+
+    @Override
+    public List<StorageMigration> privateStorageMigrations() {
+        return DouyinHistorySchema.migrations();
     }
 
     @Override

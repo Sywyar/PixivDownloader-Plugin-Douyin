@@ -1,408 +1,270 @@
 package top.sywyar.pixivdownload.douyin.db.history;
 
-import top.sywyar.pixivdownload.plugin.api.storage.PluginDataSource;
+import top.sywyar.pixivdownload.plugin.api.storage.PluginDatabase;
+import top.sywyar.pixivdownload.plugin.api.storage.relational.*;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Types;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
-/** Plain-JDBC access to the Douyin plugin's private database. */
+import static top.sywyar.pixivdownload.douyin.db.history.DouyinHistorySchema.*;
+import static top.sywyar.pixivdownload.plugin.api.storage.relational.Expression.*;
+import static top.sywyar.pixivdownload.plugin.api.storage.relational.Expression.Operator.*;
+
+/** 通过 owner 私库契约访问历史；作品、文件和来源关系共享外层事务。 */
 public class DouyinHistoryMapper {
+    private static final List<String> WORK_COLUMNS = List.of(
+            "work_id", "title", "folder", "count", "extensions", "time", "deleted", "kind",
+            "source_url", "canonical_url", "thumbnail_url", "author_id", "author_name",
+            "description", "item_title", "caption", "publish_time", "collection_id",
+            "collection_title", "collection_order");
+    private static final List<String> FILE_COLUMNS = List.of(
+            "work_id", "file_index", "media_id", "media_type", "file_name", "extension",
+            "bytes", "content_type", "created_time");
+    private static final List<String> RELATION_COLUMNS = List.of(
+            "work_id", "source_type", "source_id", "source_title", "source_url", "source_order", "discovered_time");
+    private final PluginDatabase database;
+    private final ThreadLocal<DatabaseSession> transactionSession = new ThreadLocal<>();
 
-    private static final String SELECT_WORK = "SELECT work_id, title, folder, count, extensions, time, deleted, kind,"
-            + " source_url, canonical_url, thumbnail_url, author_id, author_name, description,"
-            + " item_title, caption, publish_time, collection_id, collection_title, collection_order"
-            + " FROM douyin_works";
-    private static final String SELECT_FILE = "SELECT work_id, file_index, media_id, media_type, file_name,"
-            + " extension, bytes, content_type, created_time FROM douyin_work_files";
-    private static final List<String> SCHEMA = List.of(
-            "CREATE TABLE IF NOT EXISTS douyin_works ("
-                    + "work_id TEXT PRIMARY KEY, title TEXT NOT NULL, folder TEXT NOT NULL, count INTEGER NOT NULL,"
-                    + " extensions TEXT NOT NULL, time INTEGER NOT NULL UNIQUE, deleted INTEGER NOT NULL DEFAULT 0,"
-                    + " kind TEXT NOT NULL, source_url TEXT, canonical_url TEXT, thumbnail_url TEXT, author_id TEXT,"
-                    + " author_name TEXT, description TEXT, item_title TEXT, caption TEXT, publish_time INTEGER,"
-                    + " collection_id TEXT, collection_title TEXT, collection_order INTEGER)",
-            "CREATE INDEX IF NOT EXISTS idx_douyin_works_author_time ON douyin_works(author_id, time)",
-            "CREATE INDEX IF NOT EXISTS idx_douyin_works_collection_order"
-                    + " ON douyin_works(collection_id, collection_order)",
-            "CREATE TABLE IF NOT EXISTS douyin_work_files ("
-                    + "work_id TEXT NOT NULL, file_index INTEGER NOT NULL, media_id TEXT, media_type TEXT NOT NULL,"
-                    + " file_name TEXT NOT NULL, extension TEXT NOT NULL, bytes INTEGER, content_type TEXT,"
-                    + " created_time INTEGER NOT NULL, PRIMARY KEY(work_id, file_index))",
-            "CREATE INDEX IF NOT EXISTS idx_douyin_work_files_work_id ON douyin_work_files(work_id)",
-            "CREATE TABLE IF NOT EXISTS douyin_work_relations ("
-                    + "work_id TEXT NOT NULL, source_type TEXT NOT NULL, source_id TEXT NOT NULL, source_title TEXT,"
-                    + " source_url TEXT, source_order INTEGER, discovered_time INTEGER NOT NULL,"
-                    + " PRIMARY KEY(work_id, source_type, source_id))",
-            "CREATE INDEX IF NOT EXISTS idx_douyin_work_relations_source"
-                    + " ON douyin_work_relations(source_type, source_id, source_order)");
-
-    private final PluginDataSource dataSource;
-    private final ThreadLocal<Connection> transactionConnection = new ThreadLocal<>();
-
-    public DouyinHistoryMapper(PluginDataSource dataSource) {
-        this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
-        initializeSchema();
+    public DouyinHistoryMapper(PluginDatabase database) {
+        this.database = Objects.requireNonNull(database, "database");
     }
 
     public <T> T inTransaction(Supplier<T> action) {
         Objects.requireNonNull(action, "action");
-        if (transactionConnection.get() != null) {
-            return action.get();
-        }
-        try (Connection connection = dataSource.getConnection()) {
-            boolean originalAutoCommit = connection.getAutoCommit();
-            connection.setAutoCommit(false);
-            transactionConnection.set(connection);
-            try {
-                T result = action.get();
-                connection.commit();
-                return result;
-            } catch (RuntimeException | Error failure) {
-                rollback(connection, failure);
-                throw failure;
-            } finally {
-                transactionConnection.remove();
-                connection.setAutoCommit(originalAutoCommit);
-            }
-        } catch (SQLException e) {
-            throw databaseFailure(e);
-        }
+        if (transactionSession.get() != null) return action.get();
+        return execute(true, session -> {
+            transactionSession.set(session);
+            try { return action.get(); }
+            finally { transactionSession.remove(); }
+        });
     }
 
     public DouyinWorkRecord findActiveById(String workId) {
-        return queryOne(SELECT_WORK + " WHERE work_id = ? AND deleted = 0", List.of(workId), this::readWork);
+        return findWork(call(AND, byId(WORKS, workId), eq(WORKS, "deleted", 0)));
     }
 
-    public DouyinWorkRecord findAnyById(String workId) {
-        return queryOne(SELECT_WORK + " WHERE work_id = ?", List.of(workId), this::readWork);
-    }
+    public DouyinWorkRecord findAnyById(String workId) { return findWork(byId(WORKS, workId)); }
 
-    public List<DouyinWorkFileRecord> findFilesByWorkId(String workId) {
-        return queryList(SELECT_FILE + " WHERE work_id = ? ORDER BY file_index", List.of(workId), this::readFile);
-    }
-
-    public List<DouyinWorkRecord> findActivePage(DouyinHistoryQuery query) {
-        List<Object> parameters = new ArrayList<>();
-        StringBuilder sql = new StringBuilder(SELECT_WORK).append(" WHERE deleted = 0");
-        appendFilters(sql, parameters, query);
-        sql.append(" ORDER BY ").append(switch (query.sort()) {
-            case "title" -> "LOWER(COALESCE(NULLIF(title, ''), work_id))";
-            case "publishTime" -> "publish_time";
-            case "authorName" -> "LOWER(COALESCE(NULLIF(author_name, ''), author_id, ''))";
-            case "collectionOrder" -> "collection_order";
-            default -> "time";
-        }).append(" ").append("asc".equals(query.order()) ? "ASC" : "DESC")
-                .append(", time DESC, work_id ASC LIMIT ? OFFSET ?");
-        parameters.add(query.limit());
-        parameters.add(query.offset());
-        return queryList(sql.toString(), parameters, this::readWork);
-    }
-
-    public long countActive(DouyinHistoryQuery query) {
-        List<Object> parameters = new ArrayList<>();
-        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM douyin_works WHERE deleted = 0");
-        appendFilters(sql, parameters, query);
-        Long count = queryOne(sql.toString(), parameters, result -> result.getLong(1));
-        return count == null ? 0L : count;
-    }
-
-    public List<DouyinAuthorSummary> findAuthorFacets(DouyinHistoryQuery query) {
-        List<Object> parameters = new ArrayList<>();
-        StringBuilder sql = new StringBuilder("SELECT author_id,"
-                + " COALESCE(NULLIF(TRIM(author_name), ''), author_id), COUNT(*)"
-                + " FROM douyin_works WHERE deleted = 0"
-                + " AND author_id IS NOT NULL AND TRIM(author_id) != ''");
-        appendFilters(sql, parameters, query);
-        sql.append(" GROUP BY author_id, COALESCE(NULLIF(TRIM(author_name), ''), author_id)"
-                + " ORDER BY COUNT(*) DESC,"
-                + " LOWER(COALESCE(NULLIF(TRIM(author_name), ''), author_id)) ASC, author_id ASC LIMIT ?");
-        parameters.add(query.limit());
-        return queryList(sql.toString(), parameters,
-                result -> new DouyinAuthorSummary(result.getString(1), result.getString(2), result.getLong(3)));
-    }
-
-    public int insertWork(DouyinWorkRecord record) {
-        return update("INSERT OR IGNORE INTO douyin_works"
-                        + " (work_id, title, folder, count, extensions, time, deleted, kind, source_url, canonical_url,"
-                        + " thumbnail_url, author_id, author_name, description, item_title, caption, publish_time,"
-                        + " collection_id, collection_title, collection_order)"
-                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                workParameters(record));
-    }
-
-    public int updateActiveWork(DouyinWorkRecord record) {
-        List<Object> parameters = new ArrayList<>(workParameters(record).subList(1, 20));
-        parameters.add(record.workId());
-        return update("UPDATE douyin_works SET title = ?, folder = ?, count = ?, extensions = ?, time = ?,"
-                + " deleted = ?, kind = ?, source_url = ?, canonical_url = ?, thumbnail_url = ?, author_id = ?,"
-                + " author_name = ?, description = ?, item_title = ?, caption = ?, publish_time = ?,"
-                + " collection_id = ?, collection_title = ?, collection_order = ?"
-                + " WHERE work_id = ? AND deleted = 0", parameters);
-    }
-
-    public int upsertFile(DouyinWorkFileRecord record) {
-        return update("INSERT OR REPLACE INTO douyin_work_files"
-                        + " (work_id, file_index, media_id, media_type, file_name, extension, bytes, content_type,"
-                        + " created_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                List.of(record.workId(), record.fileIndex(), nullable(record.mediaId()), record.mediaType(),
-                        record.fileName(), record.extension(), nullable(record.bytes()), nullable(record.contentType()),
-                        record.createdTime()));
-    }
-
-    public int upsertRelation(DouyinSourceRelation relation) {
-        return update("INSERT INTO douyin_work_relations"
-                        + " (work_id, source_type, source_id, source_title, source_url, source_order, discovered_time)"
-                        + " VALUES (?, ?, ?, ?, ?, ?, ?)"
-                        + " ON CONFLICT(work_id, source_type, source_id) DO UPDATE SET"
-                        + " source_title = COALESCE(excluded.source_title, douyin_work_relations.source_title),"
-                        + " source_url = COALESCE(excluded.source_url, douyin_work_relations.source_url),"
-                        + " source_order = COALESCE(douyin_work_relations.source_order, excluded.source_order),"
-                        + " discovered_time = MIN(douyin_work_relations.discovered_time, excluded.discovered_time)",
-                List.of(relation.workId(), relation.sourceType(), relation.sourceId(), nullable(relation.sourceTitle()),
-                        nullable(relation.sourceUrl()), nullable(relation.sourceOrder()), relation.discoveredTime()));
-    }
-
-    public List<DouyinSourceRelation> findRelationsByWorkId(String workId) {
-        return queryList("SELECT work_id, source_type, source_id, source_title, source_url, source_order,"
-                        + " discovered_time FROM douyin_work_relations"
-                        + " WHERE work_id = ? ORDER BY discovered_time, source_type, source_id",
-                List.of(workId), result -> new DouyinSourceRelation(
-                        result.getString(1), result.getString(2), result.getString(3), result.getString(4),
-                        result.getString(5), nullableInt(result, 6), result.getLong(7)));
-    }
-
-    public int backfillRelations() {
-        return update("INSERT OR IGNORE INTO douyin_work_relations"
-                + " (work_id, source_type, source_id, source_title, source_url, source_order, discovered_time)"
-                + " SELECT work_id, CASE WHEN collection_id IS NOT NULL AND TRIM(collection_id) != ''"
-                + " THEN 'douyin.collection' ELSE 'douyin.single' END,"
-                + " COALESCE(NULLIF(TRIM(collection_id), ''), work_id),"
-                + " COALESCE(NULLIF(TRIM(collection_title), ''), title),"
-                + " COALESCE(NULLIF(TRIM(source_url), ''), canonical_url), collection_order, time"
-                + " FROM douyin_works", List.of());
-    }
-
-    public int countById(String workId) {
-        return count("SELECT COUNT(*) FROM douyin_works WHERE work_id = ?", workId);
-    }
-
-    public int countActiveById(String workId) {
-        return count("SELECT COUNT(*) FROM douyin_works WHERE work_id = ? AND deleted = 0", workId);
-    }
-
-    public int countDeletedById(String workId) {
-        return count("SELECT COUNT(*) FROM douyin_works WHERE work_id = ? AND deleted = 1", workId);
-    }
-
-    public int countByTime(long time) {
-        return count("SELECT COUNT(*) FROM douyin_works WHERE time = ?", time);
-    }
-
-    public Long findMaxTime() {
-        return queryOne("SELECT MAX(time) FROM douyin_works", List.of(), result -> nullableLong(result, 1));
-    }
-
-    public int markDeletedById(String workId) {
-        return update("UPDATE douyin_works SET deleted = 1 WHERE work_id = ?", List.of(workId));
-    }
-
-    public int deleteFilesByWorkId(String workId) {
-        return update("DELETE FROM douyin_work_files WHERE work_id = ?", List.of(workId));
-    }
-
-    public int deleteRelationsByWorkId(String workId) {
-        return update("DELETE FROM douyin_work_relations WHERE work_id = ?", List.of(workId));
-    }
-
-    public int deleteFilesIfWorkMarkedDeleted(String workId) {
-        return update("DELETE FROM douyin_work_files WHERE work_id IN"
-                + " (SELECT work_id FROM douyin_works WHERE work_id = ? AND deleted = 1)", List.of(workId));
-    }
-
-    public int deleteRelationsIfWorkMarkedDeleted(String workId) {
-        return update("DELETE FROM douyin_work_relations WHERE work_id IN"
-                + " (SELECT work_id FROM douyin_works WHERE work_id = ? AND deleted = 1)", List.of(workId));
-    }
-
-    public int deleteWorkIfMarkedDeleted(String workId) {
-        return update("DELETE FROM douyin_works WHERE work_id = ? AND deleted = 1", List.of(workId));
-    }
-
-    private void initializeSchema() {
-        withConnection(connection -> {
-            try (Statement statement = connection.createStatement()) {
-                for (String sql : SCHEMA) {
-                    statement.execute(sql);
-                }
-            }
-            return null;
-        });
-    }
-
-    private static void appendFilters(
-            StringBuilder sql, List<Object> parameters, DouyinHistoryQuery query) {
-        if (query.search() != null) {
-            sql.append(" AND (work_id LIKE ? OR title LIKE ? OR item_title LIKE ? OR caption LIKE ?"
-                    + " OR description LIKE ? OR author_name LIKE ?)");
-            String value = "%" + query.search() + "%";
-            for (int index = 0; index < 6; index++) {
-                parameters.add(value);
-            }
-        }
-        appendIn(sql, parameters, "author_id", query.authorIds());
-        if (!query.requiredMediaTypes().isEmpty()) {
-            sql.append(" AND EXISTS (SELECT 1 FROM douyin_work_files gallery_file"
-                    + " WHERE gallery_file.work_id = douyin_works.work_id AND gallery_file.media_type IN (")
-                    .append(placeholders(query.requiredMediaTypes().size())).append("))");
-            parameters.addAll(query.requiredMediaTypes());
-        }
-    }
-
-    private static void appendIn(
-            StringBuilder sql, List<Object> parameters, String column, List<String> values) {
-        if (values == null || values.isEmpty()) {
-            return;
-        }
-        sql.append(" AND ").append(column).append(" IN (")
-                .append(placeholders(values.size())).append(")");
-        parameters.addAll(values);
-    }
-
-    private static String placeholders(int count) {
-        return String.join(",", java.util.Collections.nCopies(count, "?"));
-    }
-
-    private int count(String sql, Object parameter) {
-        Long result = queryOne(sql, List.of(parameter), row -> row.getLong(1));
-        return result == null ? 0 : result.intValue();
-    }
-
-    private int update(String sql, List<?> parameters) {
-        return withConnection(connection -> {
-            try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                bind(statement, parameters);
-                return statement.executeUpdate();
-            }
-        });
-    }
-
-    private <T> T queryOne(String sql, List<?> parameters, RowReader<T> reader) {
-        List<T> rows = queryList(sql, parameters, reader);
+    private DouyinWorkRecord findWork(Expression where) {
+        var rows = query(new Query(WORKS, projection(WORKS, WORK_COLUMNS), where,
+                List.of(), List.of(), 1, 0), this::readWork);
         return rows.isEmpty() ? null : rows.get(0);
     }
 
-    private <T> List<T> queryList(String sql, List<?> parameters, RowReader<T> reader) {
-        return withConnection(connection -> {
-            try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                bind(statement, parameters);
-                try (ResultSet result = statement.executeQuery()) {
-                    List<T> rows = new ArrayList<>();
-                    while (result.next()) {
-                        rows.add(reader.read(result));
-                    }
-                    return Collections.unmodifiableList(rows);
-                }
-            }
-        });
+    public List<DouyinWorkFileRecord> findFilesByWorkId(String workId) {
+        return query(new Query(FILES, projection(FILES, FILE_COLUMNS), byId(FILES, workId),
+                List.of(), List.of(order(FILES, "file_index", false)), Integer.MAX_VALUE, 0), this::readFile);
     }
 
-    private <T> T withConnection(SqlAction<T> action) {
-        Connection active = transactionConnection.get();
-        if (active != null) {
-            try {
-                return action.run(active);
-            } catch (SQLException e) {
-                throw databaseFailure(e);
-            }
+    public List<DouyinWorkRecord> findActivePage(DouyinHistoryQuery query) {
+        Expression sort = switch (query.sort()) {
+            case "title" -> call(LOWER_ASCII, call(COALESCE,
+                    call(NULL_IF, column(WORKS, "title"), value("")), column(WORKS, "work_id")));
+            case "publishTime" -> column(WORKS, "publish_time");
+            case "authorName" -> call(LOWER_ASCII, call(COALESCE,
+                    call(NULL_IF, column(WORKS, "author_name"), value("")), column(WORKS, "author_id"), value("")));
+            case "collectionOrder" -> column(WORKS, "collection_order");
+            default -> column(WORKS, "time");
+        };
+        boolean descending = !"asc".equals(query.order());
+        return query(new Query(WORKS, projection(WORKS, WORK_COLUMNS), filters(query), List.of(),
+                List.of(new Query.Order(sort, descending, !descending),
+                        order(WORKS, "time", true), order(WORKS, "work_id", false)),
+                query.limit(), query.offset()), this::readWork);
+    }
+
+    public long countActive(DouyinHistoryQuery query) { return count(filters(query)); }
+
+    public List<DouyinAuthorSummary> findAuthorFacets(DouyinHistoryQuery query) {
+        var author = column(WORKS, "author_id");
+        var name = call(COALESCE, call(NULL_IF, call(TRIM, column(WORKS, "author_name")), value("")), author);
+        var source = new Query(WORKS, Map.of("author_id", author, "author_name", name),
+                call(AND, filters(query), call(NOT, call(IS_NULL, author)),
+                        call(NOT_EQUAL, call(TRIM, author), value(""))),
+                List.of(), List.of(), Integer.MAX_VALUE, 0);
+        var idColumn = column("authors", "author_id");
+        var nameColumn = column("authors", "author_name");
+        var total = call(COUNT);
+        return query(new Query(new Query.Derived(source, "authors"), List.of(),
+                Map.of("id", idColumn, "name", nameColumn, "count", total), null,
+                List.of(idColumn, nameColumn), null, List.of(new Query.Order(total, true, false),
+                        new Query.Order(call(LOWER_ASCII, nameColumn), false, true),
+                        new Query.Order(idColumn, false, true)), false, query.limit(), 0),
+                row -> new DouyinAuthorSummary(text(row, "id"), text(row, "name"), number(row, "count")));
+    }
+
+    public int insertWork(DouyinWorkRecord record) {
+        return execute(true, s -> s.insert(WORKS, workValues(record), DatabaseSession.Conflict.ignore()));
+    }
+
+    public int updateActiveWork(DouyinWorkRecord record) {
+        var changes = new LinkedHashMap<String, Expression>();
+        workValues(record).forEach((key, val) -> { if (!key.equals("work_id")) changes.put(key, value(val)); });
+        return execute(true, s -> s.update(WORKS, changes,
+                call(AND, byId(WORKS, record.workId()), eq(WORKS, "deleted", 0))));
+    }
+
+    public int upsertFile(DouyinWorkFileRecord record) {
+        var values = values(FILE_COLUMNS, record.workId(), record.fileIndex(), record.mediaId(),
+                record.mediaType(), record.fileName(), record.extension(), record.bytes(),
+                record.contentType(), record.createdTime());
+        var changes = new LinkedHashMap<String, Expression>();
+        FILE_COLUMNS.subList(2, FILE_COLUMNS.size()).forEach(key -> changes.put(key, new Incoming(key)));
+        return execute(true, s -> s.insert(FILES, values, new DatabaseSession.Conflict(
+                DatabaseSession.Mode.UPDATE, List.of("work_id", "file_index"), changes)));
+    }
+
+    public int upsertRelation(DouyinSourceRelation relation) {
+        var values = values(RELATION_COLUMNS, relation.workId(), relation.sourceType(), relation.sourceId(),
+                relation.sourceTitle(), relation.sourceUrl(), relation.sourceOrder(), relation.discoveredTime());
+        return execute(true, s -> s.insert(RELATIONS, values, new DatabaseSession.Conflict(
+                DatabaseSession.Mode.UPDATE, List.of("work_id", "source_type", "source_id"), Map.of(
+                "source_title", call(COALESCE, new Incoming("source_title"), column(RELATIONS, "source_title")),
+                "source_url", call(COALESCE, new Incoming("source_url"), column(RELATIONS, "source_url")),
+                "source_order", call(COALESCE, column(RELATIONS, "source_order"), new Incoming("source_order")),
+                "discovered_time", call(MINIMUM, column(RELATIONS, "discovered_time"), new Incoming("discovered_time"))))));
+    }
+
+    public List<DouyinSourceRelation> findRelationsByWorkId(String workId) {
+        return query(new Query(RELATIONS, projection(RELATIONS, RELATION_COLUMNS), byId(RELATIONS, workId),
+                List.of(), List.of(order(RELATIONS, "discovered_time", false),
+                        order(RELATIONS, "source_type", false), order(RELATIONS, "source_id", false)),
+                Integer.MAX_VALUE, 0), row -> new DouyinSourceRelation(
+                text(row, "work_id"), text(row, "source_type"), text(row, "source_id"),
+                text(row, "source_title"), text(row, "source_url"), integer(row, "source_order"),
+                number(row, "discovered_time")));
+    }
+
+    public int backfillRelations() { return execute(true, DouyinHistorySchema::backfillRelations); }
+    public int countById(String workId) { return Math.toIntExact(count(byId(WORKS, workId))); }
+    public int countActiveById(String workId) {
+        return Math.toIntExact(count(call(AND, byId(WORKS, workId), eq(WORKS, "deleted", 0))));
+    }
+    public int countDeletedById(String workId) {
+        return Math.toIntExact(count(call(AND, byId(WORKS, workId), eq(WORKS, "deleted", 1))));
+    }
+    public int countByTime(long time) { return Math.toIntExact(count(eq(WORKS, "time", time))); }
+
+    public Long findMaxTime() {
+        return query(new Query(WORKS, Map.of("time", call(MAX, column(WORKS, "time"))),
+                null, List.of(), List.of(), 1, 0), row -> number(row, "time")).get(0);
+    }
+
+    public int markDeletedById(String workId) {
+        return execute(true, s -> s.update(WORKS, Map.of("deleted", value(1)), byId(WORKS, workId)));
+    }
+
+    public int deleteFilesByWorkId(String workId) {
+        return execute(true, s -> s.delete(FILES, byId(FILES, workId)));
+    }
+
+    public int deleteRelationsByWorkId(String workId) {
+        return execute(true, s -> s.delete(RELATIONS, byId(RELATIONS, workId)));
+    }
+
+    public int deleteFilesIfWorkMarkedDeleted(String workId) { return deleteDetailsIfDeleted(FILES, workId); }
+    public int deleteRelationsIfWorkMarkedDeleted(String workId) { return deleteDetailsIfDeleted(RELATIONS, workId); }
+
+    private int deleteDetailsIfDeleted(String table, String workId) {
+        var deleted = new Exists(new Query(WORKS, Map.of("id", column(WORKS, "work_id")),
+                call(AND, byId(WORKS, workId), eq(WORKS, "deleted", 1)),
+                List.of(), List.of(), 1, 0));
+        return execute(true, s -> s.delete(table, call(AND, byId(table, workId), deleted)));
+    }
+
+    public int deleteWorkIfMarkedDeleted(String workId) {
+        return execute(true, s -> s.delete(WORKS, call(AND, byId(WORKS, workId), eq(WORKS, "deleted", 1))));
+    }
+
+    private static Expression filters(DouyinHistoryQuery query) {
+        var conditions = new ArrayList<Expression>();
+        conditions.add(eq(WORKS, "deleted", 0));
+        if (query.search() != null) {
+            var pattern = value("%" + query.search().replace("!", "!!") + "%");
+            conditions.add(new Call(OR, List.of("work_id", "title", "item_title", "caption", "description", "author_name")
+                    .stream().map(name -> (Expression) call(LIKE, column(WORKS, name), pattern)).toList()));
         }
-        try (Connection connection = dataSource.getConnection()) {
-            return action.run(connection);
-        } catch (SQLException e) {
-            throw databaseFailure(e);
+        if (!query.authorIds().isEmpty()) conditions.add(in(WORKS, "author_id", query.authorIds()));
+        if (!query.requiredMediaTypes().isEmpty()) {
+            conditions.add(new Exists(new Query(FILES, Map.of("id", column(FILES, "work_id")),
+                    call(AND, call(EQUAL, column(FILES, "work_id"), column(WORKS, "work_id")),
+                            in(FILES, "media_type", query.requiredMediaTypes())),
+                    List.of(), List.of(), 1, 0)));
         }
+        return conditions.size() == 1 ? conditions.get(0) : new Call(AND, conditions);
     }
 
-    private static void bind(PreparedStatement statement, List<?> parameters) throws SQLException {
-        for (int index = 0; index < parameters.size(); index++) {
-            Object value = parameters.get(index);
-            if (value == NullValue.INSTANCE) {
-                statement.setNull(index + 1, Types.NULL);
-            } else {
-                statement.setObject(index + 1, value);
-            }
-        }
+    private static Expression in(String table, String name, List<String> values) {
+        var args = new ArrayList<Expression>();
+        args.add(column(table, name));
+        values.forEach(v -> args.add(value(v)));
+        return new Call(IN, args);
     }
 
-    private DouyinWorkRecord readWork(ResultSet result) throws SQLException {
-        return new DouyinWorkRecord(
-                result.getString(1), result.getString(2), result.getString(3), result.getInt(4),
-                result.getString(5), result.getLong(6), result.getBoolean(7), result.getString(8),
-                result.getString(9), result.getString(10), result.getString(11), result.getString(12),
-                result.getString(13), result.getString(14), result.getString(15), result.getString(16),
-                nullableLong(result, 17), result.getString(18), result.getString(19), nullableInt(result, 20));
+    private long count(Expression where) {
+        return query(Query.count(WORKS, where), row -> number(row, "count")).get(0);
     }
 
-    private DouyinWorkFileRecord readFile(ResultSet result) throws SQLException {
-        return new DouyinWorkFileRecord(
-                result.getString(1), result.getInt(2), result.getString(3), result.getString(4),
-                result.getString(5), result.getString(6), nullableLong(result, 7), result.getString(8),
-                result.getLong(9));
+    private <T> List<T> query(Query query, Function<Map<String, Object>, T> reader) {
+        return execute(false, s -> s.query(query).stream().map(reader).toList());
     }
 
-    private static List<Object> workParameters(DouyinWorkRecord record) {
-        return List.of(
-                record.workId(), record.title(), record.folder(), record.count(), record.extensions(), record.time(),
-                record.deleted() ? 1 : 0, record.kind(), nullable(record.sourceUrl()), nullable(record.canonicalUrl()),
-                nullable(record.thumbnailUrl()), nullable(record.authorId()), nullable(record.authorName()),
-                nullable(record.description()), nullable(record.itemTitle()), nullable(record.caption()),
-                nullable(record.publishTime()), nullable(record.collectionId()), nullable(record.collectionTitle()),
-                nullable(record.collectionOrder()));
-    }
-
-    private static Object nullable(Object value) {
-        return value == null ? NullValue.INSTANCE : value;
-    }
-
-    private static Long nullableLong(ResultSet result, int column) throws SQLException {
-        long value = result.getLong(column);
-        return result.wasNull() ? null : value;
-    }
-
-    private static Integer nullableInt(ResultSet result, int column) throws SQLException {
-        int value = result.getInt(column);
-        return result.wasNull() ? null : value;
-    }
-
-    private static void rollback(Connection connection, Throwable failure) {
+    private <T> T execute(boolean write, DatabaseSession.Work<T> action) {
         try {
-            connection.rollback();
-        } catch (SQLException rollbackFailure) {
-            failure.addSuppressed(rollbackFailure);
+            DatabaseSession active = transactionSession.get();
+            if (active != null) return action.run(active);
+            return write ? database.transaction(action) : database.read(action);
+        } catch (SQLException failure) {
+            throw new IllegalStateException("Douyin private database operation failed", failure);
         }
     }
 
-    private static IllegalStateException databaseFailure(SQLException failure) {
-        return new IllegalStateException("Douyin private database operation failed", failure);
+    private DouyinWorkRecord readWork(Map<String, Object> row) {
+        return new DouyinWorkRecord(
+                text(row, "work_id"), text(row, "title"), text(row, "folder"), integer(row, "count"),
+                text(row, "extensions"), number(row, "time"), number(row, "deleted") != 0, text(row, "kind"),
+                text(row, "source_url"), text(row, "canonical_url"), text(row, "thumbnail_url"),
+                text(row, "author_id"), text(row, "author_name"), text(row, "description"),
+                text(row, "item_title"), text(row, "caption"), number(row, "publish_time"),
+                text(row, "collection_id"), text(row, "collection_title"), integer(row, "collection_order"));
     }
 
-    private enum NullValue { INSTANCE }
-
-    @FunctionalInterface
-    private interface RowReader<T> {
-        T read(ResultSet result) throws SQLException;
+    private DouyinWorkFileRecord readFile(Map<String, Object> row) {
+        return new DouyinWorkFileRecord(text(row, "work_id"), integer(row, "file_index"),
+                text(row, "media_id"), text(row, "media_type"), text(row, "file_name"),
+                text(row, "extension"), number(row, "bytes"), text(row, "content_type"), number(row, "created_time"));
     }
 
-    @FunctionalInterface
-    private interface SqlAction<T> {
-        T run(Connection connection) throws SQLException;
+    private static Map<String, Object> workValues(DouyinWorkRecord r) {
+        return values(WORK_COLUMNS, r.workId(), r.title(), r.folder(), r.count(), r.extensions(), r.time(),
+                r.deleted() ? 1 : 0, r.kind(), r.sourceUrl(), r.canonicalUrl(), r.thumbnailUrl(),
+                r.authorId(), r.authorName(), r.description(), r.itemTitle(), r.caption(), r.publishTime(),
+                r.collectionId(), r.collectionTitle(), r.collectionOrder());
+    }
+
+    private static Map<String, Object> values(List<String> columns, Object... values) {
+        var result = new LinkedHashMap<String, Object>();
+        for (int i = 0; i < columns.size(); i++) result.put(columns.get(i), values[i]);
+        return result;
+    }
+
+    private static Map<String, Expression> projection(String table, List<String> columns) {
+        var result = new LinkedHashMap<String, Expression>();
+        columns.forEach(name -> result.put(name, column(table, name)));
+        return result;
+    }
+
+    private static Expression byId(String table, String workId) { return eq(table, "work_id", workId); }
+    private static Expression eq(String table, String name, Object val) { return call(EQUAL, column(table, name), value(val)); }
+    private static Query.Order order(String table, String name, boolean descending) {
+        return new Query.Order(column(table, name), descending, !descending);
+    }
+    private static String text(Map<String, Object> row, String key) { return (String) row.get(key); }
+    private static Long number(Map<String, Object> row, String key) { return (Long) row.get(key); }
+    private static Integer integer(Map<String, Object> row, String key) {
+        Long value = number(row, key);
+        return value == null ? null : Math.toIntExact(value);
     }
 }

@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS douyin_works (work_id TEXT PRIMARY KEY, title TEXT NOT NULL, folder TEXT NOT NULL, count INTEGER NOT NULL, extensions TEXT NOT NULL, time INTEGER NOT NULL UNIQUE, deleted INTEGER NOT NULL DEFAULT 0, kind TEXT NOT NULL, source_url TEXT, canonical_url TEXT, thumbnail_url TEXT, author_id TEXT, author_name TEXT, description TEXT, item_title TEXT, caption TEXT, publish_time INTEGER, collection_id TEXT, collection_title TEXT, collection_order INTEGER);
+CREATE INDEX IF NOT EXISTS idx_douyin_works_author_time ON douyin_works(author_id, time);
+CREATE INDEX IF NOT EXISTS idx_douyin_works_collection_order ON douyin_works(collection_id, collection_order);
+CREATE TABLE IF NOT EXISTS douyin_work_files (work_id TEXT NOT NULL, file_index INTEGER NOT NULL, media_id TEXT, media_type TEXT NOT NULL, file_name TEXT NOT NULL, extension TEXT NOT NULL, bytes INTEGER, content_type TEXT, created_time INTEGER NOT NULL, PRIMARY KEY(work_id, file_index));
+CREATE INDEX IF NOT EXISTS idx_douyin_work_files_work_id ON douyin_work_files(work_id);
+CREATE TABLE IF NOT EXISTS douyin_work_relations (work_id TEXT NOT NULL, source_type TEXT NOT NULL, source_id TEXT NOT NULL, source_title TEXT, source_url TEXT, source_order INTEGER, discovered_time INTEGER NOT NULL, PRIMARY KEY(work_id, source_type, source_id));
+CREATE INDEX IF NOT EXISTS idx_douyin_work_relations_source ON douyin_work_relations(source_type, source_id, source_order);

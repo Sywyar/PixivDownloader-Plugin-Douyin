@@ -9,7 +9,7 @@ import top.sywyar.pixivdownload.config.DownloadSettings;
 import top.sywyar.pixivdownload.config.MultiModeSettings;
 import top.sywyar.pixivdownload.config.OutboundProxySettings;
 import top.sywyar.pixivdownload.plugin.api.storage.RuntimePathProvider;
-import top.sywyar.pixivdownload.plugin.api.storage.PluginDataSource;
+import top.sywyar.pixivdownload.plugin.api.storage.PluginDatabase;
 import top.sywyar.pixivdownload.plugin.api.http.OutboundHttpClient;
 import top.sywyar.pixivdownload.core.download.InteractiveDownloadExecutionLane;
 import top.sywyar.pixivdownload.douyin.client.redirect.DefaultDouyinShortLinkResolver;
@@ -56,8 +56,8 @@ public class DouyinPluginConfiguration {
     }
 
     @Bean
-    public DouyinHistoryMapper douyinHistoryMapper(PluginDataSource dataSource) {
-        return new DouyinHistoryMapper(dataSource);
+    public DouyinHistoryMapper douyinHistoryMapper(PluginDatabase database) {
+        return new DouyinHistoryMapper(database);
     }
 
     @Bean
@@ -68,9 +68,7 @@ public class DouyinPluginConfiguration {
 
     @Bean
     public DouyinHistoryService douyinHistoryService(DouyinHistoryRepository repository) {
-        DouyinHistoryService service = new DouyinHistoryService(repository);
-        service.backfillRelations();
-        return service;
+        return new DouyinHistoryService(repository);
     }
 
     @Bean

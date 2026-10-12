@@ -3,7 +3,6 @@ package top.sywyar.pixivdownload.douyin.db.history;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 import top.sywyar.pixivdownload.douyin.client.DefaultDouyinClient;
 import top.sywyar.pixivdownload.douyin.download.DouyinDownloadedFile;
 import top.sywyar.pixivdownload.douyin.model.work.DouyinMedia;
@@ -17,18 +16,13 @@ import top.sywyar.pixivdownload.douyin.source.DouyinSourceTypes;
 import top.sywyar.pixivdownload.plugin.api.http.OutboundHttpClient;
 import top.sywyar.pixivdownload.plugin.api.http.OutboundHttpRequest;
 import top.sywyar.pixivdownload.plugin.api.http.OutboundHttpStreamResponse;
-import top.sywyar.pixivdownload.plugin.api.storage.PluginDataSource;
 
 import java.io.ByteArrayInputStream;
-import java.io.PrintWriter;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -392,11 +386,13 @@ class DouyinHistoryServiceTest {
     }
 
     private static final class TestDb implements AutoCloseable {
+        private final TestPluginDatabase database;
         private final DouyinHistoryMapper mapper;
         private final DouyinHistoryService service;
 
         private TestDb(Path root) {
-            mapper = new DouyinHistoryMapper(new TestPluginDataSource(root.resolve("history.db")));
+            database = new TestPluginDatabase(root.resolve("history.db"));
+            mapper = new DouyinHistoryMapper(database);
             DouyinHistoryRepository repository = new DouyinHistoryRepository(
                     mapper, new DouyinStoredPathCodec(
                             DouyinPluginSettingsService.fixed(root, DouyinProxyMode.INHERIT)));
@@ -404,34 +400,9 @@ class DouyinHistoryServiceTest {
         }
 
         @Override
-        public void close() {
+        public void close() throws Exception {
+            database.close();
         }
     }
 
-    private static final class TestPluginDataSource implements PluginDataSource {
-        private final SQLiteDataSource delegate = new SQLiteDataSource();
-
-        private TestPluginDataSource(Path file) {
-            delegate.setUrl("jdbc:sqlite:" + file.toAbsolutePath().normalize());
-        }
-
-        @Override public Connection getConnection() throws SQLException { return delegate.getConnection(); }
-        @Override public Connection getConnection(String user, String password) throws SQLException {
-            return delegate.getConnection(user, password);
-        }
-        @Override public PrintWriter getLogWriter() throws SQLException { return delegate.getLogWriter(); }
-        @Override public void setLogWriter(PrintWriter writer) throws SQLException { delegate.setLogWriter(writer); }
-        @Override public void setLoginTimeout(int seconds) throws SQLException { delegate.setLoginTimeout(seconds); }
-        @Override public int getLoginTimeout() throws SQLException { return delegate.getLoginTimeout(); }
-        @Override public Logger getParentLogger() { return Logger.getLogger("douyin-test"); }
-        @Override public <T> T unwrap(Class<T> type) throws SQLException {
-            if (type.isInstance(this)) {
-                return type.cast(this);
-            }
-            return delegate.unwrap(type);
-        }
-        @Override public boolean isWrapperFor(Class<?> type) throws SQLException {
-            return type.isInstance(this) || delegate.isWrapperFor(type);
-        }
-    }
 }

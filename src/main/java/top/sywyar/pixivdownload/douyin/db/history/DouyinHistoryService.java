@@ -21,12 +21,10 @@ import java.util.concurrent.atomic.AtomicLong;
 public class DouyinHistoryService {
 
     private final DouyinHistoryRepository repository;
-    private final AtomicLong lastIssuedTime;
+    private AtomicLong lastIssuedTime;
 
     public DouyinHistoryService(DouyinHistoryRepository repository) {
         this.repository = repository;
-        Long maxTime = repository.findMaxTime();
-        this.lastIssuedTime = new AtomicLong(maxTime == null ? 0L : maxTime);
     }
 
     public int backfillRelations() {
@@ -259,21 +257,30 @@ public class DouyinHistoryService {
     }
 
     private long nextUniqueTime(long preferredTime) {
+        AtomicLong issuedTime = timeCounter();
         long base = preferredTime > 0
                 ? EpochMillisNormalizer.normalize(preferredTime)
                 : System.currentTimeMillis();
         long candidate;
         while (true) {
-            long last = lastIssuedTime.get();
+            long last = issuedTime.get();
             candidate = Math.max(base, last + 1);
-            if (lastIssuedTime.compareAndSet(last, candidate)) {
+            if (issuedTime.compareAndSet(last, candidate)) {
                 break;
             }
         }
         while (repository.countByTime(candidate) > 0) {
-            candidate = lastIssuedTime.incrementAndGet();
+            candidate = issuedTime.incrementAndGet();
         }
         return candidate;
+    }
+
+    private synchronized AtomicLong timeCounter() {
+        if (lastIssuedTime == null) {
+            Long maxTime = repository.findMaxTime();
+            lastIssuedTime = new AtomicLong(maxTime == null ? 0L : maxTime);
+        }
+        return lastIssuedTime;
     }
 
     private static DouyinSourceRelation inferredRelation(String workId,

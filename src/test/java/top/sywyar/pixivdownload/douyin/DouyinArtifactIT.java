@@ -64,6 +64,12 @@ class DouyinArtifactIT {
             assertInstanceOf(Plugin.class, instance);
             PixivPluginProvider provider = assertInstanceOf(PixivPluginProvider.class, instance);
             assertEquals(descriptor.getProperty("plugin.id"), provider.featurePlugin().id());
+            assertTrue(provider.featurePlugin().schema().isEmpty());
+            assertEquals(java.util.Set.of("douyin_works", "douyin_work_files", "douyin_work_relations"),
+                    provider.featurePlugin().privateSchema().stream().flatMap(schema -> schema.tables().stream())
+                            .map(table -> table.name()).collect(java.util.stream.Collectors.toSet()));
+            assertEquals(java.util.List.of("backfill_work_relations"),
+                    provider.featurePlugin().privateStorageMigrations().stream().map(migration -> migration.id()).toList());
             assertFalse(provider.configurationClasses().isEmpty());
             assertEquals(loader, provider.configurationClasses().get(0).getClassLoader());
             assertEquals(artifact.toUri(), type.getProtectionDomain().getCodeSource().getLocation().toURI());

@@ -35,6 +35,21 @@ class DouyinPluginDependencyGuardTest {
             .importPackages("top.sywyar.pixivdownload.douyin");
 
     @Test
+    @DisplayName("持久化只使用中性私库接口，不恢复 JDBC 或提供者实现依赖")
+    void storageUsesOnlyNeutralContract() {
+        noClasses().that().resideInAPackage("top.sywyar.pixivdownload.douyin..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "org.sqlite..", "org.postgresql..",
+                        "top.sywyar.pixivdownload.plugin.api.storage.relational.jdbc..",
+                        "top.sywyar.pixivdownload.plugin.api.database..")
+                .orShould().dependOnClassesThat().haveFullyQualifiedName(
+                        "top.sywyar.pixivdownload.plugin.api.storage.PluginDataSource")
+                .orShould().dependOnClassesThat().haveFullyQualifiedName("java.sql.Connection")
+                .orShould().dependOnClassesThat().haveFullyQualifiedName("javax.sql.DataSource")
+                .check(CLASSES);
+    }
+
+    @Test
     @DisplayName("生产代码不得依赖宿主工具、配置实现或旧队列实现包")
     void productionCodeDoesNotDependOnHostImplementationPackages() {
         noClasses()
