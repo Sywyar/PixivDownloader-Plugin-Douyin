@@ -46,18 +46,18 @@ class DefaultDouyinClientResolutionTest {
         var client = new DefaultDouyinClient(parser, rest,
                 (input, cookie) -> parser.parse(input).orElseThrow());
 
-        var work = client.resolvePublicWork("https://www.douyin.com/video/7358", "msToken=fromCookie; ttwid=tt");
+        var work = client.resolvePublicWork("https://www.douyin.com/video/7358", "msToken=fromCookie; ttwid=tt; UIFID=browser-id");
 
         assertThat(work.id()).isEqualTo("7358");
         assertThat(rest.requests()).singleElement()
                 .satisfies(uri -> {
                     assertThat(uri.getPath()).isEqualTo("/aweme/v1/web/aweme/detail/");
                     assertThat(uri.getRawQuery())
-                            .contains("aweme_id=7358", "msToken=fromCookie", "a_bogus=")
+                            .contains("aweme_id=7358", "msToken=fromCookie", "x-secsdk-web-signature=")
                             .contains("version_code=290100", "version_name=29.1.0")
                             .doesNotContain("X-Bogus=");
                 });
-        assertThat(rest.cookies()).containsExactly("msToken=fromCookie; ttwid=tt");
+        assertThat(rest.cookies()).containsExactly("msToken=fromCookie; ttwid=tt; UIFID=browser-id");
     }
 
     @Test
@@ -74,12 +74,12 @@ class DefaultDouyinClientResolutionTest {
                 (input, cookie) -> parser.parse(input).orElseThrow());
 
         var work = client.resolvePublicWork("https://www.douyin.com/video/7359",
-                "msToken=fromCookie; ttwid=tt; odin_tt=odin; passport_csrf_token=csrf");
+                "msToken=fromCookie; ttwid=tt; odin_tt=odin; passport_csrf_token=csrf; UIFID=browser-id");
 
         assertThat(work.id()).isEqualTo("7359");
         assertThat(rest.requests()).hasSize(2);
         assertThat(rest.requests().get(0).getRawQuery())
-                .contains("msToken=fromCookie", "a_bogus=")
+                .contains("msToken=fromCookie", "x-secsdk-web-signature=")
                 .doesNotContain("X-Bogus=");
         assertThat(rest.requests().get(1).getPath()).isEqualTo("/video/7359");
     }
@@ -94,7 +94,7 @@ class DefaultDouyinClientResolutionTest {
                 (input, cookie) -> parser.parse(input).orElseThrow());
 
         assertCode(() -> client.resolvePublicWork(
-                        "https://www.douyin.com/video/7361", "msToken=fromCookie; ttwid=tt"),
+                        "https://www.douyin.com/video/7361", "msToken=fromCookie; ttwid=tt; UIFID=browser-id"),
                 DouyinClientErrorCode.HTTP_FORBIDDEN);
 
         assertThat(rest.requests()).hasSize(1);

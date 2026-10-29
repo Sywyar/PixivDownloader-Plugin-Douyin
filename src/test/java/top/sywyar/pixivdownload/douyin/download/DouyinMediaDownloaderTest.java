@@ -10,6 +10,7 @@ import top.sywyar.pixivdownload.douyin.client.DouyinClientErrorCode;
 import top.sywyar.pixivdownload.douyin.client.DouyinClientException;
 import top.sywyar.pixivdownload.douyin.model.work.DouyinMedia;
 import top.sywyar.pixivdownload.douyin.model.work.DouyinMediaType;
+import top.sywyar.pixivdownload.douyin.testsupport.TestDirectoryCleanup;
 import top.sywyar.pixivdownload.plugin.api.http.OutboundHttpClient;
 import top.sywyar.pixivdownload.plugin.api.http.OutboundHttpRequest;
 import top.sywyar.pixivdownload.plugin.api.http.OutboundHttpStreamResponse;
@@ -49,13 +50,14 @@ class DouyinMediaDownloaderTest {
     private HttpServer redirectServer;
 
     @AfterEach
-    void stopServer() {
+    void stopServer() throws IOException {
         if (server != null) {
             server.stop(0);
         }
         if (redirectServer != null) {
             redirectServer.stop(0);
         }
+        TestDirectoryCleanup.delete(tempDir);
     }
 
     @Test

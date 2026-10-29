@@ -12,6 +12,7 @@ import java.sql.*;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.*;
+import static top.sywyar.pixivdownload.plugin.api.database.migration.jdbc.JdbcMigrationSupport.*;
 import static top.sywyar.pixivdownload.plugin.api.storage.relational.Expression.*;
 
 @DisplayName("Douyin 已发布私库升级与提供者迁移")
@@ -135,10 +136,10 @@ class DouyinStorageMigrationTest {
         try (var original = DriverManager.getConnection("jdbc:sqlite:" + source);
              var copy = DriverManager.getConnection("jdbc:sqlite:" + backup)) {
             assertThat(target.readSchema(copy)).isEqualTo(target.readSchema(original));
-            assertThat(top.sywyar.pixivdownload.plugin.api.database.migration.jdbc.JdbcMigrationSupport
-                    .digests(copy, originalSchema, (t, n) -> {})).isEqualTo(
-                    top.sywyar.pixivdownload.plugin.api.database.migration.jdbc.JdbcMigrationSupport
-                            .digests(original, originalSchema, (t, n) -> {}));
+            assertThat(digests(originalSchema, (t, n) -> {},
+                    table -> rows(copy, table, column -> quote(column.name())))).isEqualTo(
+                    digests(originalSchema, (t, n) -> {},
+                            table -> rows(original, table, column -> quote(column.name()))));
         }
     }
 

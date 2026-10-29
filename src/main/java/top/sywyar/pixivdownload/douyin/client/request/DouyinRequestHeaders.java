@@ -45,7 +45,25 @@ public final class DouyinRequestHeaders {
                     "Douyin credentials are not allowed for target origin: host=" + safeHost(target));
         }
         headers.put("Cookie", List.of(cookie));
+        String uifid = uifid(cookie);
+        if (!uifid.isEmpty() && "www.douyin.com".equalsIgnoreCase(target.getHost())
+                && target.getPath().startsWith("/aweme/v1/web/")) {
+            headers.put("uifid", List.of(uifid));
+        }
         return Map.copyOf(headers);
+    }
+
+    /** 读取浏览器已签发的身份值；缺失时保持为空，不生成替代值。 */
+    public static String uifid(String cookie) {
+        if (cookie != null) {
+            for (String part : cookie.split(";")) {
+                int equals = part.indexOf('=');
+                if (equals > 0 && "UIFID".equalsIgnoreCase(part.substring(0, equals).trim())) {
+                    return part.substring(equals + 1).trim();
+                }
+            }
+        }
+        return "";
     }
 
     public static boolean isCredentialOrigin(URI target) {

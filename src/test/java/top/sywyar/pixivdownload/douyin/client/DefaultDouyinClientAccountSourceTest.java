@@ -86,7 +86,7 @@ class DefaultDouyinClientAccountSourceTest {
 
         var listing = client(rest).listAccountWorksPage(
                 favoriteAccount(), DouyinAccountSource.FAVORITE_WORKS,
-                "favorite-current", 12, "sessionid=test");
+                "favorite-current", 12, "sessionid=test; UIFID=browser-id");
 
         assertThat(listing.items()).extracting("id").containsExactly("9501", "9502");
         assertThat(listing.total()).isEqualTo(7);
@@ -97,7 +97,7 @@ class DefaultDouyinClientAccountSourceTest {
         assertThat(rest.requests()).singleElement().satisfies(uri -> {
             assertThat(uri.getPath()).isEqualTo("/aweme/v1/web/aweme/listcollection/");
             assertThat(uri.getRawQuery())
-                    .contains("cursor=favorite-current", "count=12", "a_bogus=");
+                    .contains("cursor=favorite-current", "count=12", "x-secsdk-web-signature=");
         });
         assertThat(rest.methods()).containsExactly("POST");
         assertThat(rest.cookies()).singleElement().satisfies(cookie ->
@@ -270,9 +270,9 @@ class DefaultDouyinClientAccountSourceTest {
                 """);
         DefaultDouyinClient client = client(rest);
 
-        var folders = client.listFavoriteFolders("folder-current", 12, "sessionid=test");
+        var folders = client.listFavoriteFolders("folder-current", 12, "sessionid=test; UIFID=browser-id");
         var works = client.listFavoriteFolderWorksPage(
-                "folder-a", "works-current", 10, "sessionid=test");
+                "folder-a", "works-current", 10, "sessionid=test; UIFID=browser-id");
 
         assertThat(folders.items()).extracting("id", "title")
                 .containsExactly(
@@ -290,10 +290,10 @@ class DefaultDouyinClientAccountSourceTest {
                 "/aweme/v1/web/collects/list/",
                 "/aweme/v1/web/collects/video/list/");
         assertThat(rest.requests().get(0).getRawQuery())
-                .contains("cursor=folder-current", "count=12", "version_code=170400", "a_bogus=");
+                .contains("cursor=folder-current", "count=12", "version_code=170400", "x-secsdk-web-signature=");
         assertThat(rest.requests().get(1).getRawQuery())
                 .contains("collects_id=folder-a", "cursor=works-current", "count=10",
-                        "version_code=170400", "a_bogus=");
+                        "version_code=170400", "x-secsdk-web-signature=");
         assertThat(rest.methods()).containsExactly("GET", "GET");
         assertThat(rest.cookies()).allSatisfy(cookie ->
                 assertThat(cookie).contains("sessionid=test"));

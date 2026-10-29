@@ -38,7 +38,7 @@ public final class DouyinApiUriBuilder {
 
     private static LinkedHashMap<String, String> defaultQuery(String cookie) {
         // 只保留标识「抖音 Web 应用」所需的最小客户端身份参数；不伪造任何浏览器/设备/运行环境指纹。
-        // 受签名保护的端点需由 DouyinSignedUriBuilder 注入的真实签名器才能通过服务端验签。
+        // 签名与 UIFID 由 DouyinSignedUriBuilder 从同一请求凭据构造。
         LinkedHashMap<String, String> params = new LinkedHashMap<>();
         params.put("device_platform", "webapp");
         params.put("aid", "6383");

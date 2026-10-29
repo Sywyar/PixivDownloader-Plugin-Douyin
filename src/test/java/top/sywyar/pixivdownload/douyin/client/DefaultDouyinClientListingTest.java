@@ -155,7 +155,7 @@ class DefaultDouyinClientListingTest {
                 """);
 
         var listing = client(rest).listUserLikedWorksPage(
-                "sec-target", "liked-current", 24, "sessionid=test");
+                "sec-target", "liked-current", 24, "sessionid=test; UIFID=browser-id");
 
         assertThat(listing.items()).extracting("id").containsExactly("9151");
         assertThat(listing.ownerId()).isEqualTo("sec-target");
@@ -169,7 +169,7 @@ class DefaultDouyinClientListingTest {
                     "max_cursor=liked-current",
                     "count=24",
                     "locate_query=false",
-                    "a_bogus=");
+                    "x-secsdk-web-signature=");
         });
         assertThat(rest.methods()).containsExactly("GET");
     }

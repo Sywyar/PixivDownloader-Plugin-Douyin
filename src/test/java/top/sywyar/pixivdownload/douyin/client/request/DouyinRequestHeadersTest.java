@@ -17,7 +17,23 @@ class DouyinRequestHeadersTest {
     void standardHeadersNeverContainCookie() {
         var headers = DouyinRequestHeaders.standard();
 
-        assertThat(headers).doesNotContainKey("Cookie");
+        assertThat(headers).doesNotContainKeys("Cookie", "uifid");
+    }
+
+    @Test
+    @DisplayName("浏览器身份只进入抖音 Web API，不进入公开页面或媒体 origin")
+    void browserIdentityStaysOnWebApi() throws Exception {
+        String cookie = "sessionid=fixture; UIFID=browser-id";
+        var headers = DouyinRequestHeaders.credentials(
+                URI.create("https://www.douyin.com/aweme/v1/web/aweme/post/"), cookie);
+        assertThat(headers.get("uifid")).containsExactly("browser-id");
+        assertThat(headers.get("Cookie")).containsExactly(cookie);
+        assertThat(DouyinRequestHeaders.credentials(URI.create("https://www.douyin.com/video/1"), cookie))
+                .doesNotContainKey("uifid");
+        assertThatThrownBy(() -> DouyinRequestHeaders.credentials(
+                URI.create("https://cdn.douyin.com/media"), cookie)).isInstanceOf(DouyinClientException.class);
+        assertThat(DouyinRequestHeaders.uifid(null)).isEmpty();
+        assertThat(DouyinRequestHeaders.uifid("UIFID=; sessionid=fixture")).isEmpty();
     }
 
     @Test
