@@ -2,7 +2,7 @@
 
 [简体中文](README.md)
 
-Adds Douyin downloads, queue operations, a gallery and scheduled sources to PixivDownloader. The plugin ID is `douyin`, its version is `1.0.0-rc.4`, and its only production dependency is `io.github.sywyar.pixivdownloader:pixivdownload-sdk` declared in `pom.xml`. It requires runtime SDK `1.3` or later within the same major version.
+Adds Douyin downloads, queue operations, a gallery and scheduled sources to PixivDownloader. The plugin ID is `douyin`, its version is `1.0.0-rc.4`, and its only production dependency is `io.github.sywyar.pixivdownloader:pixivdownload-sdk` declared in `pom.xml`. It requires runtime SDK `1.4` or later within the same major version.
 
 This repository also serves as a complete community submission example, covering real plugin source, building, running, behavior declarations, candidate packages and submission for review. Being an example does not mean the plugin has passed community review.
 

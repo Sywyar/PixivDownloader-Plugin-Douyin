@@ -2,7 +2,7 @@
 
 [English](README_en.md)
 
-为 PixivDownloader 提供抖音作品下载、队列操作、画廊和计划来源。插件 ID 为 `douyin`，版本为 `1.0.0-rc.4`，生产代码只依赖 `pom.xml` 中声明的 `io.github.sywyar.pixivdownloader:pixivdownload-sdk`，最低运行 SDK 为 `1.3`。
+为 PixivDownloader 提供抖音作品下载、队列操作、画廊和计划来源。插件 ID 为 `douyin`，版本为 `1.0.0-rc.4`，生产代码只依赖 `pom.xml` 中声明的 `io.github.sywyar.pixivdownloader:pixivdownload-sdk`，最低运行 SDK 为 `1.4`。
 
 本仓库也作为完整社区投稿示例：开发者可以从实际插件源码开始，学习构建、运行、能力声明、生成候选包和提交审核。示例身份不表示插件已经通过社区审核。
 
